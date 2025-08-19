@@ -4,6 +4,7 @@ using AddressBook.Application.Services;
 using AddressBook.Infrastructure;
 using AddressBook.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.OpenApi.Models;
 using OpenIddict.Abstractions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -142,45 +143,37 @@ builder.Services.AddScoped<IContactRepository, ContactRepository>();
 builder.Services.AddScoped<IGroupRepository, GroupRepository>();
 
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new() { Title = "AddressBook API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "AddressBook API", Version = "v1" });
 
-    c.AddSecurityDefinition("oauth2", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    // OAuth2 / Bearer token definition
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
-        Type = Microsoft.OpenApi.Models.SecuritySchemeType.OAuth2,
-        Flows = new Microsoft.OpenApi.Models.OpenApiOAuthFlows
-        {
-            ClientCredentials = new Microsoft.OpenApi.Models.OpenApiOAuthFlow
-            {
-                TokenUrl = new Uri("https://localhost:44397/connect/token"),
-                Scopes = new Dictionary<string, string>
-                {
-                    { "addressbook.read", "Read access to Address Book API" },
-                    { "addressbook.write", "Write access to Address Book API" }
-                }
-            }
-        }
+        Name = "Authorization",
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Enter 'Bearer {token}' to authenticate."
     });
 
-    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    // Apply to all endpoints
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
         {
-            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            new OpenApiSecurityScheme
             {
-                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                Reference = new OpenApiReference
                 {
-                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
-                    Id = "oauth2"
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
                 }
             },
-            new[] { "addressbook.read", "addressbook.write" }
+            Array.Empty<string>()
         }
     });
 });
-
 
 var app = builder.Build();
 
