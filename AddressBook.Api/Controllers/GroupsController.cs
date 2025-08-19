@@ -10,7 +10,6 @@ using System.Text.Json;
 namespace AddressBook.Api.Controllers
 {
     [Route("api/[controller]")]
-    [Authorize(Policy = "ApiScope")]
     [ApiController]
     public class GroupsController : ControllerBase
     {
@@ -21,6 +20,7 @@ namespace AddressBook.Api.Controllers
         }                     
 
         [HttpPost]
+        [Authorize(Policy = "WriteScope")]
         public async Task<IActionResult> UpsertGroup([FromBody] GroupDto groupDto)
         {
             if (groupDto == null)
@@ -41,6 +41,7 @@ namespace AddressBook.Api.Controllers
         }
 
         [HttpGet("{id:guid}")]
+        [Authorize(Policy = "ReadScope")]
         public async Task<IActionResult> GetGroupById(Guid id)
         {
             try
@@ -60,7 +61,10 @@ namespace AddressBook.Api.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, $"An unexpected error occurred in {nameof(GetGroupById)}: {ex.Message}");
             }
         }
+
+
         [HttpGet]
+        [Authorize(Policy = "ReadScope")]
         public async Task<IActionResult> GetGroupList([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
             try

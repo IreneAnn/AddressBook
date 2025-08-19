@@ -10,8 +10,7 @@ using System.Text.Json;
 
 namespace AddressBook.Api.Controllers
 {
-    [Route("api/[controller]")]
-    [Authorize(Policy = "ApiScope")]
+    [Route("api/[controller]")]   
     [ApiController]
     public class ContactsController : ControllerBase
     {
@@ -23,6 +22,7 @@ namespace AddressBook.Api.Controllers
 
 
         [HttpPost]
+        [Authorize(Policy = "WriteScope")]
         public async Task<IActionResult> UpsertContact([FromBody] ContactDto contactDto)
         {
             if (contactDto == null)
@@ -45,6 +45,7 @@ namespace AddressBook.Api.Controllers
         }
 
         [HttpGet("{id:guid}")]
+        [Authorize(Policy = "ReadScope")]
         public async Task<IActionResult> GetContactById(Guid id)
         {
             if (id == Guid.Empty)
@@ -66,6 +67,7 @@ namespace AddressBook.Api.Controllers
         }
 
         [HttpGet]
+        [Authorize(Policy = "ReadScope")]
         public async Task<IActionResult> GetContactList([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
             try
