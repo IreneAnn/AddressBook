@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AddressBook.Infrastructure"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AddressBook.Api", "AddressBook.Api\AddressBook.Api.csproj", "{5104CE28-E819-45F7-B87A-721EB515531C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AddressBook.Tests", "AddressBook.Tests\AddressBook.Tests.csproj", "{2E19CE5D-52F7-4283-9819-8051927817AF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -69,8 +71,23 @@ Global
 		{5104CE28-E819-45F7-B87A-721EB515531C}.Release|x64.Build.0 = Release|Any CPU
 		{5104CE28-E819-45F7-B87A-721EB515531C}.Release|x86.ActiveCfg = Release|Any CPU
 		{5104CE28-E819-45F7-B87A-721EB515531C}.Release|x86.Build.0 = Release|Any CPU
+		{2E19CE5D-52F7-4283-9819-8051927817AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2E19CE5D-52F7-4283-9819-8051927817AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2E19CE5D-52F7-4283-9819-8051927817AF}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2E19CE5D-52F7-4283-9819-8051927817AF}.Debug|x64.Build.0 = Debug|Any CPU
+		{2E19CE5D-52F7-4283-9819-8051927817AF}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2E19CE5D-52F7-4283-9819-8051927817AF}.Debug|x86.Build.0 = Debug|Any CPU
+		{2E19CE5D-52F7-4283-9819-8051927817AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2E19CE5D-52F7-4283-9819-8051927817AF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2E19CE5D-52F7-4283-9819-8051927817AF}.Release|x64.ActiveCfg = Release|Any CPU
+		{2E19CE5D-52F7-4283-9819-8051927817AF}.Release|x64.Build.0 = Release|Any CPU
+		{2E19CE5D-52F7-4283-9819-8051927817AF}.Release|x86.ActiveCfg = Release|Any CPU
+		{2E19CE5D-52F7-4283-9819-8051927817AF}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {0599073E-9820-4950-8D9A-83FA166ED282}
 	EndGlobalSection
 EndGlobal

@@ -1,6 +1,7 @@
 ﻿using AddressBook.Application.DTO;
 using AddressBook.Application.Interfaces.Services;
 using AddressBook.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -10,6 +11,7 @@ using System.Text.Json;
 namespace AddressBook.Api.Controllers
 {
     [Route("api/[controller]")]
+    //[Authorize(Policy = "ApiScope")]
     [ApiController]
     public class ContactsController : ControllerBase
     {
@@ -38,8 +40,7 @@ namespace AddressBook.Api.Controllers
             catch (Exception ex)
             {
                 return StatusCode(StatusCodes.Status500InternalServerError, $"An unexpected error occurred  in {nameof(UpsertContact)}: {ex.Message}");
-            }
-            
+            }           
             
         }
 

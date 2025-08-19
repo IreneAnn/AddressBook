@@ -1,6 +1,7 @@
 ﻿using AddressBook.Application.DTO;
 using AddressBook.Application.Interfaces.Services;
 using AddressBook.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +10,7 @@ using System.Text.Json;
 namespace AddressBook.Api.Controllers
 {
     [Route("api/[controller]")]
+    [Authorize(Policy = "ApiScope")]
     [ApiController]
     public class GroupsController : ControllerBase
     {
@@ -58,7 +60,6 @@ namespace AddressBook.Api.Controllers
                 return StatusCode(StatusCodes.Status500InternalServerError, $"An unexpected error occurred in {nameof(GetGroupById)}: {ex.Message}");
             }
         }
-
         [HttpGet]
         public async Task<IActionResult> GetGroupList([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {

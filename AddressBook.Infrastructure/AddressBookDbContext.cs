@@ -14,6 +14,8 @@ namespace AddressBook.Infrastructure
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+            modelBuilder.UseOpenIddict(); // adds OpenIddict models to the EF Core model
+
             modelBuilder.Entity<Contact>(b =>
             {
                 b.HasKey(c => c.Id);
