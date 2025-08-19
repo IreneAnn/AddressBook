@@ -11,7 +11,7 @@ using System.Text.Json;
 namespace AddressBook.Api.Controllers
 {
     [Route("api/[controller]")]
-    //[Authorize(Policy = "ApiScope")]
+    [Authorize(Policy = "ApiScope")]
     [ApiController]
     public class ContactsController : ControllerBase
     {

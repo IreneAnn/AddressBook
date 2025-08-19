@@ -32,7 +32,6 @@ builder.Services.AddOpenIddict()
         options.SetTokenEndpointUris("/connect/token");
 
         options.AllowClientCredentialsFlow();
-        options.AllowAuthorizationCodeFlow();
 
         options.AcceptAnonymousClients();
 
