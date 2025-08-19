@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json;
 
 namespace AddressBook.Api.Controllers
@@ -14,9 +16,11 @@ namespace AddressBook.Api.Controllers
     public class GroupsController : ControllerBase
     {
         private readonly IGroupService _groupService;
-        public GroupsController(IGroupService groupService)
+        private readonly IMemoryCache _memoryCache;
+        public GroupsController(IGroupService groupService,IMemoryCache memoryCache)
         {
             _groupService = groupService;
+            _memoryCache = memoryCache;
         }                     
 
         [HttpPost]
@@ -49,7 +53,7 @@ namespace AddressBook.Api.Controllers
                 if (id == Guid.Empty)
                     return BadRequest("Invalid Group id."); // 400
 
-                var result = await _groupService.GetGroupByIdAsync(id);
+               var result = await _groupService.GetGroupByIdAsync(id);
 
                 if (result == null)
                     return NotFound("Group with id not found."); // 404
@@ -74,20 +78,35 @@ namespace AddressBook.Api.Controllers
                     return BadRequest("Page and PageSize must be greater than zero."); // 400
                 }
 
-                var (items, totalCount) = await _groupService.GetGroupListAsync(page, pageSize);
+                string cacheKey = $"GroupList_{page}_{pageSize}";
 
-                var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
-                var paginationHeader = new
+                if (!_memoryCache.TryGetValue(cacheKey, out (IEnumerable<GroupDto> Items, int TotalCount) cachedResult))
                 {
-                    totalCount,
+                    // Fetch from service/db
+                    cachedResult = await _groupService.GetGroupListAsync(page, pageSize);
+
+                    // Set cache options
+                    var cacheOptions = new MemoryCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(60)
+                    };
+
+                    _memoryCache.Set(cacheKey, cachedResult, cacheOptions);                    
+                }
+              
+                if (cachedResult.TotalCount == 0)
+                    return NotFound("No groups found.");
+
+                Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(new
+                {
+                    cachedResult.TotalCount,
                     pageSize,
                     currentPage = page,
-                    totalPages
-                };
+                    totalPages = (int)Math.Ceiling(cachedResult.TotalCount / (double)pageSize)
+                }));
 
-                Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(paginationHeader));
-
-                return Ok(items); // 200    
+                return Ok(cachedResult.Items); //200           
+                
             }
             catch (Exception ex)
             {

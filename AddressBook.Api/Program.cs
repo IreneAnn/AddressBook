@@ -1,4 +1,4 @@
-using AddressBook.Application.Interfaces.Repositories;
+﻿using AddressBook.Application.Interfaces.Repositories;
 using AddressBook.Application.Interfaces.Services;
 using AddressBook.Application.Services;
 using AddressBook.Infrastructure;
@@ -20,6 +20,8 @@ builder.Services.AddDbContext<AddressBookDbContext>(options =>
     options.UseSqlite(conn)
            .UseOpenIddict(); // Required for OpenIddict entities
 });
+
+builder.Services.AddMemoryCache();
 
 // OpenIddict configuration
 builder.Services.AddOpenIddict()

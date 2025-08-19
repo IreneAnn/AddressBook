@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using System.Reflection;
 using System.Text.Json;
 
@@ -15,9 +16,11 @@ namespace AddressBook.Api.Controllers
     public class ContactsController : ControllerBase
     {
         private readonly IContactService _contactService;
-        public ContactsController(IContactService contactService)
+        private readonly IMemoryCache _memoryCache;
+        public ContactsController(IContactService contactService, IMemoryCache memoryCache)
         {
             _contactService = contactService;
+            _memoryCache = memoryCache; 
         }
 
 
@@ -77,22 +80,37 @@ namespace AddressBook.Api.Controllers
                     return BadRequest("Page and pageSize must be greater than zero.");
                 }
 
-                var (contactList, totalCount) = await _contactService.GetContactListAsync(page, pageSize);
+                // Generate a cache key unique per user and query parameters
+                var cacheKey = $"contacts_{User.Identity?.Name}_{page}_{pageSize}";
 
-                if (totalCount == 0)
+                if (!_memoryCache.TryGetValue(cacheKey, out (IEnumerable<ContactDto> Items, int Total) cachedResult))
+                {
+                    // Cache miss: fetch from service
+                    cachedResult = await _contactService.GetContactListAsync(page, pageSize);
+
+                    // Cache options: expire after 60 seconds
+                    var cacheOptions = new MemoryCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(60)
+                    };
+
+                    _memoryCache.Set(cacheKey, cachedResult, cacheOptions);
+                }
+
+                if (cachedResult.Total == 0)
                 {
                     return NotFound("No contacts found.");
                 }
-
+                // Add pagination headers
                 Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(new
                 {
-                    totalCount,
+                    cachedResult.Total,
                     pageSize,
                     currentPage = page,
-                    totalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+                    totalPages = (int)Math.Ceiling(cachedResult.Total / (double)pageSize)
                 }));
 
-                return Ok(contactList); // 200
+                return Ok(cachedResult.Items);
             }
             catch (Exception ex)
             {
