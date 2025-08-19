@@ -8,7 +8,7 @@ namespace AddressBook.Infrastructure
 {
     public static class OpenIddictSeed
     {
-        public static async Task InitializeAsync(IOpenIddictApplicationManager manager)
+        /*public static async Task InitializeAsync(IOpenIddictApplicationManager manager)
         {
             
             if (await manager.FindByClientIdAsync("addressbook.client") == null)
@@ -26,6 +26,6 @@ namespace AddressBook.Infrastructure
             }
                 });
             }           
-        }
+        }*/
     }
 }

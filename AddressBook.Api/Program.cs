@@ -30,14 +30,27 @@ builder.Services.AddOpenIddict()
     .AddServer(options =>
     {
         options.SetTokenEndpointUris("/connect/token");
+
         options.AllowClientCredentialsFlow();
+        options.AllowAuthorizationCodeFlow();
+
         options.AcceptAnonymousClients();
+
         // Register the signing and encryption credentials.
         options.AddDevelopmentEncryptionCertificate()
                .AddDevelopmentSigningCertificate();
-        options.UseAspNetCore()
-              .EnableTokenEndpointPassthrough();
 
+        options.AddEphemeralEncryptionKey()
+                        .AddEphemeralSigningKey()
+                        .DisableAccessTokenEncryption();
+
+        options.UseAspNetCore()
+              .EnableTokenEndpointPassthrough()
+                        .EnableAuthorizationEndpointPassthrough();
+
+        //options.DisableTransportSecurityRequirement();
+
+        
     });
     
 
