@@ -99,7 +99,7 @@ namespace AddressBook.Api.Controllers
                 if (page <= 0 || pageSize <= 0)
                 {
                     _logger.LogWarning("Invalid page or pageSize: page={Page}, pageSize={PageSize}", page, pageSize);
-                    return BadRequest("Page and PageSize must be greater than zero."); // 400
+                    return BadRequest("Page and PageSize must be greater than zero."); 
                 }
 
                 string cacheKey = $"GroupList_{page}_{pageSize}";
@@ -126,7 +126,6 @@ namespace AddressBook.Api.Controllers
                 if (cachedResult.TotalCount == 0)
                 {
                     _logger.LogInformation("No groups found for page={Page} pageSize={PageSize}", page, pageSize);
-                    return NotFound("No groups found."); // 404
                 }
 
                 Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(new
@@ -138,7 +137,7 @@ namespace AddressBook.Api.Controllers
                 }));
 
                 _logger.LogInformation("Returning {Count} groups for page={Page} pageSize={PageSize}", cachedResult.Items.Count(), page, pageSize);
-                return Ok(cachedResult.Items); //200           
+                return Ok(cachedResult.Items); 
                 
             }
             catch (Exception ex)

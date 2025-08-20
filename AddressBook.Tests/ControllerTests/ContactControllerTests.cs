@@ -195,28 +195,7 @@ namespace AddressBook.Tests.ControllerTests
                 var badRequest = Assert.IsType<BadRequestObjectResult>(result);
                 Assert.Equal("Page and pageSize must be greater than zero.", badRequest.Value);
             }
-
-            [Fact]
-            public async Task GetContactList_NoContacts_ReturnsNotFound() 
-            {
-                // Arrange
-                _mockContactService.Setup(s => s.GetContactListAsync(1, 10)).ReturnsAsync((new List<ContactDto>(), 0));
-
-                object cacheEntry = null;
-                _mockMemoryCache.Setup(m => m.TryGetValue(It.IsAny<object>(), out cacheEntry))
-                         .Returns(false);
-
-                _mockMemoryCache.Setup(m => m.CreateEntry(It.IsAny<object>()))
-                         .Returns(Mock.Of<ICacheEntry>());
-
-                // Act
-                var result = await _controller.GetContactList(1, 10);
-
-                // Assert
-                var notFound = Assert.IsType<NotFoundObjectResult>(result);
-                Assert.Equal("No contacts found.", notFound.Value);
-            }
-
+         
             [Fact]
             public async Task GetContactList_ReturnsOkWithContacts() 
             {

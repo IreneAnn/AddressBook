@@ -129,7 +129,6 @@ namespace AddressBook.Api.Controllers
                 if (cachedResult.Total == 0)
                 {
                     _logger.LogInformation("No contacts found for page {Page}", page);
-                    return NotFound("No contacts found.");
                 }
                 // Add pagination headers
                 Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(new
