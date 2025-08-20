@@ -3,6 +3,7 @@ using AddressBook.Application.Interfaces.Repositories;
 using AddressBook.Application.Interfaces.Services;
 using AddressBook.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,10 +20,12 @@ namespace AddressBook.Application.Services
     {
         private readonly IContactRepository _contactRepository;
         private readonly IGroupRepository _groupRepository;
-        public ContactService(IContactRepository contactRepository,IGroupRepository groupRepository)
+        private readonly ILogger<ContactService> _logger;
+        public ContactService(IContactRepository contactRepository,IGroupRepository groupRepository, ILogger<ContactService> logger)
         {
             _contactRepository = contactRepository;
             _groupRepository = groupRepository;
+            _logger = logger;
         }
 
         public async Task<UpsertContactResult?> UpsertContactAsync(ContactDto contactDto)
@@ -33,6 +36,7 @@ namespace AddressBook.Application.Services
                 if (contactDto.Id.HasValue)
                 {
                     contact = await _contactRepository.GetContactByIdAsync(contactDto.Id.Value) ?? new Contact();
+                    _logger.LogInformation("Fetching contact with Id: {ContactId}", contactDto.Id);
                 }
                 else
                 {
@@ -54,12 +58,15 @@ namespace AddressBook.Application.Services
                         foreach (var group in groups)
                         {
                             contact.Groups.Add(group); // Add new groups to the existing list of groups in a contact
+                            _logger.LogDebug("Added group {GroupId} to contact {ContactId}", group.Id, contact.Id);
                         }
                         //contact.Groups = groups; // Rewrite the old groups with the new groups
                     }
                 }
 
                 var upsertStatus = await _contactRepository.UpsertContactAsync(contact);
+                _logger.LogInformation("Contact upsert completed. Status: {Status}, ContactId: {ContactId}", upsertStatus, contact.Id);
+
                 return new UpsertContactResult
                 {
                     ContactDto = new ContactDto
@@ -76,10 +83,9 @@ namespace AddressBook.Application.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in {nameof(UpsertContactAsync)}: {ex}");
+                _logger.LogError(ex, "Error in {MethodName} for ContactDto: {@ContactDto}", nameof(UpsertContactAsync), contactDto);
                 throw;
-            }
-            
+            }           
             
         }
 
@@ -93,7 +99,7 @@ namespace AddressBook.Application.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in {nameof(GetContactByIdAsync)}: {ex}");
+                _logger.LogError(ex, "Error in {MethodName} for ContactId: {ContactId}", nameof(GetContactByIdAsync), id);
                 return null;
             }
         }
@@ -115,11 +121,12 @@ namespace AddressBook.Application.Services
                     GroupIds = c.Groups.Select(g => g.Id)
                 });
 
+                _logger.LogInformation("Fetched {Count} contacts out of total {TotalCount}", dtos.Count(), contactListCount);
                 return (dtos, contactListCount);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in {nameof(GetContactListAsync)}: {ex}");
+                _logger.LogError(ex, "Error in {MethodName} while fetching contacts. Page: {Page}, PageSize: {PageSize}", nameof(GetContactListAsync), page, pageSize);
                 return (Enumerable.Empty<ContactDto>(), 0);
             }
             

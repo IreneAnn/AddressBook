@@ -17,10 +17,12 @@ namespace AddressBook.Api.Controllers
     {
         private readonly IGroupService _groupService;
         private readonly IMemoryCache _memoryCache;
-        public GroupsController(IGroupService groupService,IMemoryCache memoryCache)
+        private readonly ILogger<GroupsController> _logger;
+        public GroupsController(IGroupService groupService,IMemoryCache memoryCache, ILogger<GroupsController> logger)
         {
             _groupService = groupService;
             _memoryCache = memoryCache;
+            _logger = logger;
         }                     
 
         [HttpPost]
@@ -28,18 +30,28 @@ namespace AddressBook.Api.Controllers
         public async Task<IActionResult> UpsertGroup([FromBody] GroupDto groupDto)
         {
             if (groupDto == null)
+            {
+                _logger.LogWarning("GroupDto is null in UpsertGroup");
                 return BadRequest("Group data is required."); //400
+            }             
 
             try
             {
                 var result = await _groupService.UpsertGroupAsync(groupDto);
                 if (result?.Status == UpsertStatus.Created)
+                {
+                    _logger.LogInformation("Group created with Id={GroupId}", result.GroupDto.Id);
                     return CreatedAtAction(nameof(UpsertGroup), new { id = result.GroupDto.Id }, result.GroupDto); // 201
+                }                   
                 else // Updated
+                {
+                    _logger.LogInformation("Group updated with Id={GroupId}", result?.GroupDto.Id);
                     return Ok(result?.GroupDto); //200
+                }                    
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error occurred in upserting group");
                 return StatusCode(StatusCodes.Status500InternalServerError, $"An unexpected error occurred in {nameof(UpsertGroup)}: {ex.Message}");
             }                       
         }
@@ -50,18 +62,30 @@ namespace AddressBook.Api.Controllers
         {
             try
             {
+                _logger.LogInformation("GetGroupById called with Id={id}", id);
                 if (id == Guid.Empty)
-                    return BadRequest("Invalid Group id."); // 400
+                {
+                    _logger.LogWarning("Invalid Group id: {Id}", id);
+                    return BadRequest("Invalid Group id"); // 400
+                }
 
                var result = await _groupService.GetGroupByIdAsync(id);
 
                 if (result == null)
+                {
+                    _logger.LogInformation("Group not found for Id={id}", id);
                     return NotFound("Group with id not found."); // 404
-
-                return Ok(result); // 200
+                }
+                else
+                {
+                    _logger.LogInformation("Returning group details for Id={id}", id);
+                    return Ok(result); // 200
+                }                   
+             
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error occurred while fetching group by Id={id}", id);
                 return StatusCode(StatusCodes.Status500InternalServerError, $"An unexpected error occurred in {nameof(GetGroupById)}: {ex.Message}");
             }
         }
@@ -73,8 +97,11 @@ namespace AddressBook.Api.Controllers
         {
             try
             {
+                _logger.LogInformation("GetGroupList called with page={Page} pageSize={PageSize}", page, pageSize);
+
                 if (page <= 0 || pageSize <= 0)
                 {
+                    _logger.LogWarning("Invalid page or pageSize: page={Page}, pageSize={PageSize}", page, pageSize);
                     return BadRequest("Page and PageSize must be greater than zero."); // 400
                 }
 
@@ -83,6 +110,7 @@ namespace AddressBook.Api.Controllers
                 if (!_memoryCache.TryGetValue(cacheKey, out (IEnumerable<GroupDto> Items, int TotalCount) cachedResult))
                 {
                     // Fetch from service/db
+                    _logger.LogInformation("Cache MISS for key={CacheKey}", cacheKey);
                     cachedResult = await _groupService.GetGroupListAsync(page, pageSize);
 
                     // Set cache options
@@ -93,9 +121,16 @@ namespace AddressBook.Api.Controllers
 
                     _memoryCache.Set(cacheKey, cachedResult, cacheOptions);                    
                 }
-              
+                else
+                {
+                    _logger.LogInformation("Cache HIT for key={CacheKey}", cacheKey);
+                }
+
                 if (cachedResult.TotalCount == 0)
-                    return NotFound("No groups found.");
+                {
+                    _logger.LogInformation("No groups found for page={Page} pageSize={PageSize}", page, pageSize);
+                    return NotFound("No groups found."); // 404
+                }
 
                 Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(new
                 {
@@ -105,11 +140,13 @@ namespace AddressBook.Api.Controllers
                     totalPages = (int)Math.Ceiling(cachedResult.TotalCount / (double)pageSize)
                 }));
 
+                _logger.LogInformation("Returning {Count} groups for page={Page} pageSize={PageSize}", cachedResult.Items.Count(), page, pageSize);
                 return Ok(cachedResult.Items); //200           
                 
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error occurred while fetching group list for page={Page} pageSize={PageSize}", page, pageSize);
                 return StatusCode(StatusCodes.Status500InternalServerError, $"An error occurred in {nameof(GetGroupList)} while fetching groups: {ex.Message}"); // 500
             }
         }
