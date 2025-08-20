@@ -100,9 +100,10 @@ Create/Update contact
 Create/Update group
 ```json
  {
-    "id": "5a736c07-7add-4bc4-bae8-7370faf55091",
-    "name": "Work",
-    "contactIds": [      
+    "id": "1957b7c4-f352-416f-a574-071a489c98cc",
+    "name": "Family",
+    "contactIds": [
+      "a7712c75-40ba-4f0f-bcb1-f7648c8df90f"
     ]
   }
 ```
@@ -186,3 +187,24 @@ dotnet test
 - Controllers: `AddressBook.Api/Controllers/*`
 - EF Core: `AddressBook.Infrastructure/AddressBookDbContext.cs`, `AddressBook.Infrastructure/Repositories/*`
 - DTOs: `AddressBook.Application/DTO/*`
+
+AddressBook
+Create a basic .Net Core restful API which implements an address book of contacts where a contact has the following details:
+
+•	First name
+•	Last name
+•	Phone number
+•	Email
+
+Also include the ability to add a contact to a “group”. Where a contact can belong to multiple groups; each group just has a name.
+
+The app should implement the following:
+
+•	An endpoint/API call to add/update a new group
+•	An endpoint/API call to add/update a new contact
+•	An endpoint/API call to get a list of groups and an individual group
+•	An endpoint/API call to get a list of contacts and an individual contact
+•	Support pagination
+•	The endpoints should be secured by OAuth client credential flow
+
+You can use SQLite as the db, please provide this also when you submit your code along with relevant user credentials to access the calls.
