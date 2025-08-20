@@ -124,13 +124,20 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("ReadScope", policy =>
     {
         policy.RequireAuthenticatedUser();
-        policy.RequireClaim("scope", "addressbook.read");
+        policy.RequireAssertion(context =>
+            context.User.HasClaim(c =>
+                c.Type == "scope" && c.Value.Split(' ').Contains("addressbook.read")));
     });
 
     options.AddPolicy("WriteScope", policy =>
     {
         policy.RequireAuthenticatedUser();
-        policy.RequireClaim("scope", "addressbook.write");
+        policy.RequireAssertion(context =>
+        {
+            var scopesClaim = context.User.FindFirst(c => c.Type == "scope")?.Value ?? "";
+            var scopes = scopesClaim.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            return scopes.Contains("addressbook.read") && scopes.Contains("addressbook.write");
+        });
     });
 });
 
@@ -157,10 +164,10 @@ builder.Services.AddSwaggerGen(c =>
             {
                 TokenUrl = new Uri("https://localhost:7255/connect/token", UriKind.Absolute),
                 Scopes = new Dictionary<string, string>
-                {
-                    { "addressbook.read", "Read access to Address Book API" },
-                    { "addressbook.write", "Write access to Address Book API" }
-                }
+            {
+                { "addressbook.read", "Read access to Address Book API" },
+                { "addressbook.write", "Write access to Address Book API" }
+            }
             }
         }
     });
@@ -178,7 +185,7 @@ builder.Services.AddSwaggerGen(c =>
                     Id = "oauth2"
                 }
             },
-           new[] { "addressbook.read", "addressbook.write" }
+           new[] { "addressbook.read", "addressbook.write" } // both required for WriteScope endpoints
         }
     });
 });

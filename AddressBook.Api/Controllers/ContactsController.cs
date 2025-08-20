@@ -68,7 +68,7 @@ namespace AddressBook.Api.Controllers
             if (id == Guid.Empty)
             {
                 _logger.LogWarning("Invalid contact id provided: {id}", id);
-                return BadRequest("Invalid contact id."); // 400
+                return BadRequest("Invalid contact id."); 
             }
 
             try
@@ -78,16 +78,16 @@ namespace AddressBook.Api.Controllers
                 if (result == null)
                 {
                     _logger.LogInformation("Contact not found for id={id}", id);
-                    return NotFound("Contact with id not found."); // 404
+                    return NotFound("Contact with id not found."); 
                 }
 
                 _logger.LogInformation("Returning contact details for id={id}", id);
-                return Ok(result); // 200
+                return Ok(result); 
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error occurred while fetching contact by id={id}", id);
-                return StatusCode(StatusCodes.Status500InternalServerError,$"An unexpected error occurred in {nameof(GetContactById)}: {ex.Message}"); // 500             
+                return StatusCode(StatusCodes.Status500InternalServerError,$"An unexpected error occurred in {nameof(GetContactById)}: {ex.Message}");           
             }           
         }
 
