@@ -2,6 +2,8 @@
 using AddressBook.Application.Interfaces.Repositories;
 using AddressBook.Application.Services;
 using AddressBook.Domain.Entities;
+using Castle.Core.Logging;
+using Microsoft.Extensions.Logging;
 using Moq;
 using System;
 using System.Collections.Generic;
@@ -15,13 +17,15 @@ namespace AddressBook.Tests.ServiceTests
     {
         private readonly Mock<IContactRepository> _mockContactRepo;
         private readonly Mock<IGroupRepository> _mockGroupRepo;
+        private readonly Mock<ILogger<ContactService>> _mockLogger;
         private readonly ContactService _service;
 
         public ContactServiceTests()
         {
             _mockContactRepo = new Mock<IContactRepository>();
             _mockGroupRepo = new Mock<IGroupRepository>();
-            _service = new ContactService(_mockContactRepo.Object, _mockGroupRepo.Object);
+            _mockLogger = new Mock<ILogger<ContactService>>();
+            _service = new ContactService(_mockContactRepo.Object, _mockGroupRepo.Object, _mockLogger.Object);
         }
 
         #region UpsertContactAsync Tests

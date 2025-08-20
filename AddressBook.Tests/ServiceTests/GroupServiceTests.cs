@@ -2,24 +2,22 @@
 using AddressBook.Application.Interfaces.Repositories;
 using AddressBook.Application.Services;
 using AddressBook.Domain.Entities;
+using Microsoft.Extensions.Logging;
 using Moq;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace AddressBook.Tests.ServiceTests
 {
     public class GroupServiceTests
     {
         private readonly Mock<IGroupRepository> _mockRepo;
+        private readonly Mock<ILogger<GroupService>> _mockLogger;
         private readonly GroupService _service;
 
         public GroupServiceTests()
         {
             _mockRepo = new Mock<IGroupRepository>();
-            _service = new GroupService(_mockRepo.Object);
+            _mockLogger = new Mock<ILogger<GroupService>>();
+            _service = new GroupService(_mockRepo.Object, _mockLogger.Object);
         }
 
         [Fact]

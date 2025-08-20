@@ -108,7 +108,7 @@ namespace AddressBook.Api.Controllers
                 }
 
                 // Generate a cache key unique per user and query parameters
-                var cacheKey = $"contacts_{User.Identity?.Name}_{page}_{pageSize}";
+                var cacheKey = $"contacts_{User?.Identity?.Name}_{page}_{pageSize}";
 
                 if (!_memoryCache.TryGetValue(cacheKey, out (IEnumerable<ContactDto> Items, int Total) cachedResult))
                 {

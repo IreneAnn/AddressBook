@@ -5,6 +5,8 @@ using AddressBook.Application.Interfaces.Services;
 using AddressBook.Domain.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace AddressBook.Tests.ControllerTests
@@ -12,15 +14,18 @@ namespace AddressBook.Tests.ControllerTests
     public class GroupsControllerTests
     {
         private readonly Mock<IGroupService> _mockGroupService;
+        private readonly Mock<IMemoryCache> _mockCache;
+        private readonly Mock<ILogger<GroupsController>> _mockLogger;
         private readonly GroupsController _controller;
 
         public GroupsControllerTests()
         {
             _mockGroupService = new Mock<IGroupService>();
-            _controller = new GroupsController(_mockGroupService.Object);
+            _mockCache = new Mock<IMemoryCache>();
+            _mockLogger = new Mock<ILogger<GroupsController>>();
+            _controller = new GroupsController(_mockGroupService.Object, _mockCache.Object, _mockLogger.Object);
         }
-
-
+       
         #region UpsertGroup
 
         [Fact]
@@ -88,7 +93,7 @@ namespace AddressBook.Tests.ControllerTests
             var result = await _controller.GetGroupById(Guid.Empty);
 
             var badRequest = Assert.IsType<BadRequestObjectResult>(result);
-            Assert.Equal("Invalid Group id.", badRequest.Value);
+            Assert.Equal("Invalid Group id", badRequest.Value);
         }
 
         [Fact]
@@ -135,6 +140,13 @@ namespace AddressBook.Tests.ControllerTests
 
             _mockGroupService.Setup(s => s.GetGroupListAsync(page, pageSize))
                 .ReturnsAsync((groups, totalCount));
+
+            object cacheEntry = null;
+            _mockCache.Setup(m => m.TryGetValue(It.IsAny<object>(), out cacheEntry))
+                     .Returns(false);
+
+            _mockCache.Setup(m => m.CreateEntry(It.IsAny<object>()))
+                     .Returns(Mock.Of<ICacheEntry>());
 
             // Initialize ControllerContext
             _controller.ControllerContext = new ControllerContext
