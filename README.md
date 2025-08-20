@@ -40,7 +40,6 @@ A layered Address Book Web API with Contacts and Groups, using EF Core (SQLite),
 dotnet restore
 dotnet run -p AddressBook.Api
 ```
-
 - HTTPS: https://localhost:7255
 
 Swagger UI:  https://localhost:7255/swagger
@@ -50,7 +49,19 @@ Database: SQLite file `addressbook.db` created under `AddressBook.Api/`.
 Connection string: taken from `ConnectionStrings:DefaultConnection` if present, otherwise defaults to `Data Source=addressbook.db`.
 
 ---
-
+## Swagger/OpenAPI
+- Enabled in development via `AddEndpointsApiExplorer()` and `AddSwaggerGen()`; UI available at `/swagger` on your chosen base URL.
+- OAuth2 Client Credentials is configured (security scheme `oauth2`) with scopes `addressbook.read` and `addressbook.write`.
+- In Swagger UI, click "**Authorize**":
+  - Use the OAuth2 flow (
+	- **ClientId**: `addressbook.client`, 
+	- **ClientSecret**: `secret`,
+	- select scopes -
+    - **Write scope** :'addressbook.write'
+    - **Read scope** : 'addressbook.read'
+	- check addressbook.read and uncheck addressbook.write for get endpoints and 
+	- addressbook.write and uncheck addressbook.read for write endpoints) — dev only;
+  
 ## API endpoints
 
 ### Contacts (`AddressBook.Api/Controllers/ContactsController.cs`)
@@ -74,26 +85,27 @@ Connection string: taken from `ConnectionStrings:DefaultConnection` if present, 
 ### Sample payloads
 Create/Update contact
 ```json
-{
-  "id": null,
-  "firstName": "Ada",
-  "lastName": "Lovelace",
-  "phoneNumber": "123456789",
-  "email": "ada@example.com",
-  "groupIds": ["11111111-1111-1111-1111-111111111111"]
-}
+  {
+    "id": "a7712c75-40ba-4f0f-bcb1-f7648c8df90f",
+    "firstName": "Thomas",
+    "lastName": "Alexander",
+    "phoneNumber": "02214275254",
+    "email": "thomasalexander@gmail.com",
+    "groupIds": [
+      "1957b7c4-f352-416f-a574-071a489c98cc"
+    ]
+  }
 ```
 
 Create/Update group
 ```json
-{
-  "id": null,
-  "name": "Friends",
-  "contactIds": []
-}
+ {
+    "id": "5a736c07-7add-4bc4-bae8-7370faf55091",
+    "name": "Work",
+    "contactIds": [      
+    ]
+  }
 ```
-
----
 
 ## Authentication and OAuth (OpenIddict)
 Auth is scaffolded in `AddressBook.Api/Program.cs`.
@@ -122,20 +134,6 @@ curl https://localhost:7255/api/groups \
 
 Note:
 - The app currently sets the token issuer and JWT validation authority to `https://localhost:7255/`.
-
----
-
-## Swagger/OpenAPI
-- Enabled in development via `AddEndpointsApiExplorer()` and `AddSwaggerGen()`; UI available at `/swagger` on your chosen base URL.
-- OAuth2 Client Credentials is configured (security scheme `oauth2`) with scopes `addressbook.read` and `addressbook.write`.
-- In Swagger UI, click "Authorize":
-  - Use the OAuth2 flow (
-	- ClientId: `addressbook.client`, 
-	- ClientSecret: `secret`,
-	- select scopes - 
-	- check addressbook.read and uncheck addressbook.write for get endpoints and 
-	- addressbook.write and uncheck addressbook.read for write endpoints) — dev only;
-  
 
 ---
 
