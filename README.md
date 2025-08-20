@@ -57,11 +57,9 @@ Connection string: taken from `ConnectionStrings:DefaultConnection` if present, 
 	- **ClientId**: `addressbook.client`, 
 	- **ClientSecret**: `secret`,
 	- select scopes -
-    - **Write scope** :'addressbook.write'
+    - **Write scope** :'addressbook.read addressbook.write'
     - **Read scope** : 'addressbook.read'
-	- check addressbook.read and uncheck addressbook.write for get endpoints and 
-	- addressbook.write and uncheck addressbook.read for write endpoints) — dev only;
-  
+	  
 ## API endpoints
 
 ### Contacts (`AddressBook.Api/Controllers/ContactsController.cs`)
