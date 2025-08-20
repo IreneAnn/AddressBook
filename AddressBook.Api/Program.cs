@@ -125,14 +125,12 @@ builder.Services.AddAuthorization(options =>
     {
         policy.RequireAuthenticatedUser();
         policy.RequireClaim("scope", "addressbook.read");
-        //policy.RequireClaim("scope", "addressbook.read".Split(' '));
     });
 
     options.AddPolicy("WriteScope", policy =>
     {
         policy.RequireAuthenticatedUser();
         policy.RequireClaim("scope", "addressbook.write");
-        //policy.RequireClaim("scope", "addressbook.write.Split(' ')");
     });
 });
 
@@ -150,16 +148,25 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "AddressBook API", Version = "v1" });
 
     // OAuth2 / Bearer token definition
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    // OAuth2 definition for Client Credentials
+    c.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
     {
-        Name = "Authorization",
-        Type = SecuritySchemeType.Http,
-        Scheme = "bearer",
-        BearerFormat = "JWT",
-        In = ParameterLocation.Header,
-        Description = "Enter 'Bearer {token}' to authenticate."
+        Type = SecuritySchemeType.OAuth2,
+        Flows = new OpenApiOAuthFlows
+        {
+            ClientCredentials = new OpenApiOAuthFlow
+            {
+                TokenUrl = new Uri("https://localhost:44397/connect/token", UriKind.Absolute),
+                Scopes = new Dictionary<string, string>
+                {
+                    { "addressbook.read", "Read access to Address Book API" },
+                    { "addressbook.write", "Write access to Address Book API" }
+                }
+            }
+        }
     });
 
+    
     // Apply to all endpoints
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
@@ -169,10 +176,10 @@ builder.Services.AddSwaggerGen(c =>
                 Reference = new OpenApiReference
                 {
                     Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
+                    Id = "oauth2"
                 }
             },
-            Array.Empty<string>()
+           new[] { "addressbook.read", "addressbook.write" }
         }
     });
 });
@@ -185,10 +192,12 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "AddressBook API v1");
+
+        // OAuth2 Client Credentials setup
         c.OAuthClientId("addressbook.client");
         c.OAuthClientSecret("secret");
-        c.OAuthUsePkce();
         c.OAuthScopes("addressbook.read", "addressbook.write");
+        c.OAuthUsePkce(); // optional, for auth code flow
     });
 }
 
