@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore;
+﻿using AddressBook.Application.DTO;
+using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -10,8 +11,11 @@ namespace AddressBook.Api.Controllers
 {
     public class AuthorizationController : Controller
     {
-        [HttpPost("~/connect/token"), Produces("application/json")]
-        public async Task<IActionResult> Exchange()
+        
+        [HttpPost("~/connect/token")]
+        [Consumes("application/x-www-form-urlencoded")]
+        [Produces("application/json")]
+        public async Task<IActionResult> Exchange([FromForm] TokenRequestDto dto)
         {
             var request = HttpContext.GetOpenIddictServerRequest();
             
@@ -35,7 +39,7 @@ namespace AddressBook.Api.Controllers
                 }
 
                  // 🔹 Add issuer
-                identity.AddClaim(JwtRegisteredClaimNames.Iss, "https://localhost:44397/"); // your issuer
+                identity.AddClaim(JwtRegisteredClaimNames.Iss, "https://localhost:7255/"); // your issuer
 
                 var principal = new ClaimsPrincipal(identity);
                 principal.SetScopes(request.GetScopes());

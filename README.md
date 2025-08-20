@@ -1,5 +1,4 @@
 # AddressBook
-# AddressBook
 ## AddressBook — Clean Architecture Web API (.NET 9)
 
 A layered Address Book Web API with Contacts and Groups, using EF Core (SQLite), OpenIddict-based OAuth/OpenID Connect server scaffolding, Swagger, and unit tests.
@@ -9,9 +8,10 @@ A layered Address Book Web API with Contacts and Groups, using EF Core (SQLite),
 - Many-to-many relation between contacts and groups
 - Pagination with X-Pagination response header
 - EF Core 9 + SQLite with automatic migrations on startup
-- OpenIddict server scaffold (token endpoint, client credentials and authorization code flows)
-- JWT Bearer authentication pipeline (requires Authority/validation wiring)
-- Swagger/OpenAPI UI in development
+- OpenIddict server configured (token endpoint; client credentials flow implemented)
+- JWT Bearer authentication configured (Authority/Audience validation; see Auth section)
+- Swagger/OpenAPI UI in development with OAuth2 (client credentials) security scheme
+- In-memory caching for list endpoints (60s TTL per page/pageSize)
 - Unit tests with xUnit and Moq
 
 ---
@@ -41,11 +41,9 @@ dotnet restore
 dotnet run -p AddressBook.Api
 ```
 
-Default URLs (see `AddressBook.Api/Properties/launchSettings.json`):
-- HTTP: http://localhost:5134
 - HTTPS: https://localhost:7255
 
-Swagger UI: https://localhost:44397/swagger
+Swagger UI:  https://localhost:7255/swagger
 
 Database: SQLite file `addressbook.db` created under `AddressBook.Api/`.
 
@@ -56,19 +54,22 @@ Connection string: taken from `ConnectionStrings:DefaultConnection` if present, 
 ## API endpoints
 
 ### Contacts (`AddressBook.Api/Controllers/ContactsController.cs`)
+- Secured via [Authorize] policies: `WriteScope` for POST, `ReadScope` for GET
 - POST `/api/contacts` — Upsert contact (create or update)
   - 201 Created when new contact; 200 OK when existing contact updated
 - GET `/api/contacts/{id:guid}` — Get contact by id
   - 200 OK or 404 NotFound
 - GET `/api/contacts?page=1&pageSize=10` — Paged contact list
-  - Returns `X-Pagination` header: `totalCount`, `pageSize`, `currentPage`, `totalPages`
-    -returns 404 when empty 
+  - Returns `X-Pagination` header: `Total`, `pageSize`, `currentPage`, `totalPages`
+  - Returns 200 OK with empty array when no data
+  - Note: Cache key includes the user's identity. With client-credentials tokens `User?.Identity?.Name` is typically null, so keys may be shared across clients (same key). Consider including client_id/subject in the key or switch to distributed cache.
 
 ### Groups (`AddressBook.Api/Controllers/GroupsController.cs`)
-- Controller is decorated with `[Authorize(Policy = "WriteScope")]` or `[Authorize(Policy = "ReadScope")]'
+- Secured via [Authorize] policies: `WriteScope` for POST, `ReadScope` for GET
 - POST `/api/groups` — Upsert group
 - GET `/api/groups/{id:guid}` — Get group by id
 - GET `/api/groups?page=1&pageSize=10` — Paged group list with `X-Pagination`
+  - Returns `X-Pagination` header: `TotalCount`, `pageSize`, `currentPage`, `totalPages`
 
 ### Sample payloads
 Create/Update contact
@@ -99,42 +100,51 @@ Auth is scaffolded in `AddressBook.Api/Program.cs`.
 
 Configured:
 - Token endpoint: `/connect/token`
-- Flows: Client Credentials, Authorization Code
+- Flow: Client Credentials (Authorization Code planned)
 - Development signing/encryption certs + ephemeral keys (dev only)
 - Seeding on startup:
-  - Scope `addressbook.api`
-  - Client `addressbook.client` with secret `secret` and client credentials grant permission
+  - Scopes `addressbook.read` and `addressbook.write`
+  - Client `addressbook.client` with secret `secret` and client credentials grant (permissions include both scopes)
 
-### Client Credentials quick test (after wiring validation)
-Get token
+### Client Credentials quick test
+Get token (replace base URL if using IIS Express)
 ```bash
 curl -X POST https://localhost:7255/connect/token \
  -H "Content-Type: application/x-www-form-urlencoded" \
- -d "grant_type=client_credentials&client_id=addressbook.client&client_secret=secret&scope=addressbook.api"
+ -d "grant_type=client_credentials&client_id=addressbook.client&client_secret=secret&scope=addressbook.read%20addressbook.write"
 ```
 
 Call a protected endpoint
 ```bash
-curl https://localhost:44397/api/groups \
+curl https://localhost:7255/api/groups \
  -H "Authorization: Bearer <access_token>"
 ```
+
+Note:
+- The app currently sets the token issuer and JWT validation authority to `https://localhost:7255/`.
 
 ---
 
 ## Swagger/OpenAPI
-- Enabled in development via `AddEndpointsApiExplorer()` and `AddSwaggerGen()`; UI at `/swagger`.
-- Recommended: Add OAuth2 security definition and requirement so you can authorize in Swagger UI.
+- Enabled in development via `AddEndpointsApiExplorer()` and `AddSwaggerGen()`; UI available at `/swagger` on your chosen base URL.
+- OAuth2 Client Credentials is configured (security scheme `oauth2`) with scopes `addressbook.read` and `addressbook.write`.
+- In Swagger UI, click "Authorize":
+  - Use the OAuth2 flow (
+	- ClientId: `addressbook.client`, 
+	- ClientSecret: `secret`,
+	- select scopes - 
+	- check addressbook.read and uncheck addressbook.write for get endpoints and 
+	- addressbook.write and uncheck addressbook.read for write endpoints) — dev only;
+  
 
 ---
 
 ## Caching
-Current status: No caching implemented.
-
-Options to consider:
-- Response caching for list endpoints (`AddResponseCaching`, `UseResponseCaching`, `[ResponseCache]`)
-- HTTP caching headers/ETags for GETs
-- IMemoryCache for in-process caching; IDistributedCache/Redis for production
-- EF optimizations: compiled queries, `AsNoTracking` for read-only queries, appropriate indexes
+Current status: In-memory caching implemented for list endpoints (TTL 60s).
+- `ContactsController.GetContactList()`: key is `contacts_{User?.Identity?.Name}_{page}_{pageSize}`
+- `GroupsController.GetGroupList()`: key is `GroupList_{page}_{pageSize}`
+Notes:
+- Cache is per-process. Use `IDistributedCache`/Redis for multi-instance deployments.
 
 ---
 
@@ -142,7 +152,7 @@ Options to consider:
 - Manage contacts: upsert, get contact by id, paginated list
 - Manage groups: upsert, get group by id, paginated list
 - Associate contacts and groups via IDs in DTOs
-- Secure endpoints using scope-based policy once JWT validation/policy are configured
+- Secure endpoints using scope-based policies; ensure tokens include `addressbook.read` (GET) or `addressbook.write` (POST)
 
 ---
 
@@ -155,13 +165,26 @@ Run tests:
 dotnet test
 ```
 
-## Future improvements
-- Complete OpenIddict validation wiring; implement scope/role-based authorization
-- Add Authorization Code + PKCE, refresh tokens, and user management if needed
-- Filtering/sorting/search on list endpoints; API versioning
-- Standardize pagination (return 200 on empty), add PATCH and ETags for concurrency
-- Introduce caching (response, ETag, Redis) and performance tuning
-- Auditing, soft deletes, timestamps, concurrency tokens
-- Observability: structured logging, correlation IDs, health checks, OpenTelemetry traces/metrics
-- DX/Ops: CI/CD, containerization, IaC
-- Extensibility: domain events/outbox, background jobs, consider GraphQL/gRPC if appropriate
+## Known Issues and Considerations
+- Issuer/Authority mismatch: JWT Bearer `Authority` is `https://localhost:7255/`.. Align issuer/authority and token `iss` in `AddressBook.Api/Program.cs` and `AuthorizationController.cs`.
+- AcceptAnonymousClients vs ClientId: `AcceptAnonymousClients()` is enabled, but `AuthorizationController.Exchange()` requires `request.ClientId` (throws if null). Remove anonymous clients or handle missing client IDs.
+- Dev-only settings: `RequireHttpsMetadata = false`, development certs, and `DisableAccessTokenEncryption()` are for local/dev only.
+- Secrets in code: Client secret appears in `SeedOpenIddictClients()` and Swagger UI OAuth config. Move to configuration/user-secrets.
+- Cache key collisions: `ContactsController` cache key uses `User?.Identity?.Name`; with client-credentials this is null and may cause cross-client cache sharing.
+- No cache invalidation on writes; consider eviction strategy or cache busting.
+- Minimal DTO validation; add data annotations or FluentValidation and consistent ProblemDetails responses.
+- Read performance: consider `AsNoTracking()` and projection for read-only queries.
+- Security hardening: add CORS, rate limiting, audit logging.
+- Observability: health checks, correlation IDs, OpenTelemetry for traces/metrics.
+
+## Troubleshooting
+- 401/403: Ensure token has the right scopes (`addressbook.read` for GET, `addressbook.write` for POST) and `aud` = `addressbook.api`.
+- Issuer/metadata issues: Make the running URL match `Authority` and the token `iss` claim; adjust `AuthorizationController` issuer if needed.
+- SQLite DB issues: Confirm working directory and connection string (defaults to `Data Source=addressbook.db`).
+
+## File References
+- Auth/DI/Swagger: `AddressBook.Api/Program.cs`
+- Token issuance: `AddressBook.Api/Controllers/AuthorizationController.cs`
+- Controllers: `AddressBook.Api/Controllers/*`
+- EF Core: `AddressBook.Infrastructure/AddressBookDbContext.cs`, `AddressBook.Infrastructure/Repositories/*`
+- DTOs: `AddressBook.Application/DTO/*`

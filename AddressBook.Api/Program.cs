@@ -56,14 +56,14 @@ builder.Services.AddOpenIddict()
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
     {
-        options.Authority = "https://localhost:44397/"; // your OpenIddict server URL
+        options.Authority = "https://localhost:7255/"; // your OpenIddict server URL
         options.RequireHttpsMetadata = false;
 
         // Token validation parameters
         options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = "https://localhost:44397/",   // must match your token's 'iss'
+            ValidIssuer = "https://localhost:7255/",   // must match your token's 'iss'
 
             ValidateAudience = true,
             ValidAudience = "addressbook.api",        // must match your token's 'aud'
@@ -147,7 +147,6 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "AddressBook API", Version = "v1" });
 
-    // OAuth2 / Bearer token definition
     // OAuth2 definition for Client Credentials
     c.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
     {
@@ -156,7 +155,7 @@ builder.Services.AddSwaggerGen(c =>
         {
             ClientCredentials = new OpenApiOAuthFlow
             {
-                TokenUrl = new Uri("https://localhost:44397/connect/token", UriKind.Absolute),
+                TokenUrl = new Uri("https://localhost:7255/connect/token", UriKind.Absolute),
                 Scopes = new Dictionary<string, string>
                 {
                     { "addressbook.read", "Read access to Address Book API" },
