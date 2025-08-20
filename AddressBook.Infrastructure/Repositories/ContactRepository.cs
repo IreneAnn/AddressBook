@@ -36,13 +36,14 @@ namespace AddressBook.Infrastructure.Repositories
                 existingContact.PhoneNumber = newContact.PhoneNumber;
                 existingContact.Email = newContact.Email;
 
+                
                 // Sync groups
-                var newGroupIds = newContact.Groups.Select(x => x.Id); ; // get the group ids of the new contact
+                var newGroupIds = newContact.Groups.Select(x => x.Id);  // get the group ids of the new contact
                 var groupsToAssign = await _addressBookDbContext.Groups
                     .Where(g => newGroupIds.Contains(g.Id)) // get their corresponding groups
                     .ToListAsync();
+               
                 existingContact.Groups.Clear();
-
                     foreach (var group in groupsToAssign)
                     existingContact.Groups.Add(group);
                 upsertStatus = UpsertStatus.Updated;
@@ -58,7 +59,7 @@ namespace AddressBook.Infrastructure.Repositories
 
         public async Task<(IEnumerable<Contact> Items, int Total)> GetContactListAsync(int page, int pageSize)
         {
-            var contactList = _addressBookDbContext.Contacts.Include(c => c.Groups).OrderBy(c => c.Id);
+            var contactList = _addressBookDbContext.Contacts.Include(c => c.Groups).OrderBy(c => c.FirstName);
             var contactListCount = await contactList.CountAsync();
             var list = await contactList.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
             return (list, contactListCount);

@@ -32,15 +32,11 @@ namespace AddressBook.Application.Services
         {
             try
             {
-                Contact contact;
+                Contact contact= new Contact();
                 if (contactDto.Id.HasValue)
                 {
                     contact = await _contactRepository.GetContactByIdAsync(contactDto.Id.Value) ?? new Contact();
                     _logger.LogInformation("Fetching contact with Id: {ContactId}", contactDto.Id);
-                }
-                else
-                {
-                    contact = new Contact();
                 }
 
                 contact.FirstName = contactDto.FirstName;

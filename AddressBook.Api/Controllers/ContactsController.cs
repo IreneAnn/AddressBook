@@ -2,11 +2,8 @@
 using AddressBook.Application.Interfaces.Services;
 using AddressBook.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
-using System.Reflection;
 using System.Text.Json;
 
 namespace AddressBook.Api.Controllers
@@ -26,8 +23,9 @@ namespace AddressBook.Api.Controllers
         }
 
 
+
         [HttpPost]
-        [Authorize(Policy = "WriteScope")]
+        [Authorize(Policy = "WriteScope")]       
         public async Task<IActionResult> UpsertContact([FromBody] ContactDto contactDto)
         {
             if (contactDto == null)

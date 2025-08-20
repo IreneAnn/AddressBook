@@ -32,7 +32,7 @@ namespace AddressBook.Tests.ControllerTests
             #region UpsertContact
 
             [Fact]
-            public async Task UpsertContact_NullContact_ReturnsBadRequest() //400
+            public async Task UpsertContact_NullContact_ReturnsBadRequest()
             {
                 // Arrange
                 ContactDto contactDto = null;
@@ -46,7 +46,7 @@ namespace AddressBook.Tests.ControllerTests
             }
 
             [Fact]
-            public async Task UpsertContact_NewContact_ReturnsCreated() //201
+            public async Task UpsertContact_NewContact_ReturnsCreated() 
             {
                 // Arrange
                 var contactDto = new ContactDto { FirstName = "John", LastName = "Doe" };
@@ -62,7 +62,7 @@ namespace AddressBook.Tests.ControllerTests
             }
 
             [Fact]
-            public async Task UpsertContact_ExistingContact_ReturnsOk() //200
+            public async Task UpsertContact_ExistingContact_ReturnsOk() 
             {
                 // Arrange
                 var contactDto = new ContactDto { FirstName = "Jane", LastName = "Smith" };
@@ -104,18 +104,17 @@ namespace AddressBook.Tests.ControllerTests
                 // Assert
                 var objectResult = Assert.IsType<ObjectResult>(result);
                 Assert.Equal(StatusCodes.Status500InternalServerError, objectResult.StatusCode);
-                Assert.Contains("An unexpected error occurred", objectResult.Value.ToString());
-                Assert.Contains("UpsertContact", objectResult.Value.ToString());
-            } //500
+                Assert.Contains("An unexpected error occurred", objectResult?.Value?.ToString());
+                Assert.Contains("UpsertContact", objectResult?.Value?.ToString());
+            } 
 
             #endregion
-
 
 
             #region GetContactById
 
             [Fact]
-            public async Task GetContactById_InvalidId_ReturnsBadRequest() //400
+            public async Task GetContactById_InvalidId_ReturnsBadRequest() 
             {
                 // Act
                 var result = await _controller.GetContactById(Guid.Empty);
@@ -126,7 +125,7 @@ namespace AddressBook.Tests.ControllerTests
             }
 
             [Fact]
-            public async Task GetContactById_NotFound_ReturnsNotFound() //404
+            public async Task GetContactById_NotFound_ReturnsNotFound() 
             {
                 // Arrange
                 var id = Guid.NewGuid();
@@ -141,11 +140,11 @@ namespace AddressBook.Tests.ControllerTests
             }
 
             [Fact]
-            public async Task GetContactById_ValidId_ReturnsOk() //200
+            public async Task GetContactById_ValidId_ReturnsOk() 
             {
                 // Arrange
                 var id = Guid.NewGuid();
-                var contactDto = new ContactDto { Id = id, FirstName = "John", LastName = "Doe" };
+                var contactDto = new ContactDto { Id = id, FirstName = "John", LastName = "Doe", PhoneNumber="012322323", Email="johndoe@gmail.com"};
                 _mockContactService.Setup(s => s.GetContactByIdAsync(id)).ReturnsAsync(contactDto);
 
                 // Act
@@ -160,14 +159,13 @@ namespace AddressBook.Tests.ControllerTests
             public async Task GetContactById_ServiceThrowsException_Returns500()
             {
                 // Arrange
-                var mockService = new Mock<IContactService>();
                 var contactId = Guid.NewGuid();
 
                 // Setup the service to throw an exception
-                mockService.Setup(s => s.GetContactByIdAsync(It.IsAny<Guid>()))
-                           .ThrowsAsync(new Exception("Database failure"));
+                _mockContactService.Setup(s => s.GetContactByIdAsync(It.IsAny<Guid>()))
+                           .ThrowsAsync(new Exception("An unexpected error occurred in GetContactById"));
 
-                var controller = new ContactsController(mockService.Object, _mockMemoryCache.Object, _mockLogger.Object);
+                var controller = new ContactsController(_mockContactService.Object, _mockMemoryCache.Object, _mockLogger.Object);
 
                 // Act
                 var result = await controller.GetContactById(contactId);
@@ -175,9 +173,9 @@ namespace AddressBook.Tests.ControllerTests
                 // Assert
                 var objectResult = Assert.IsType<ObjectResult>(result);
                 Assert.Equal(StatusCodes.Status500InternalServerError, objectResult.StatusCode);
-                Assert.Contains("An unexpected error occurred", objectResult.Value.ToString());
-                Assert.Contains("GetContactById", objectResult.Value.ToString());
-            } //500
+                Assert.Contains("An unexpected error occurred", objectResult?.Value?.ToString());
+                Assert.Contains("GetContactById", objectResult?.Value?.ToString());
+            }
 
 
             #endregion
@@ -188,7 +186,7 @@ namespace AddressBook.Tests.ControllerTests
 
 
             [Fact]
-            public async Task GetContactList_InvalidPagination_ReturnsBadRequest() //400
+            public async Task GetContactList_InvalidPagination_ReturnsBadRequest() 
             {
                 // Act
                 var result = await _controller.GetContactList(0, 0);
@@ -199,7 +197,7 @@ namespace AddressBook.Tests.ControllerTests
             }
 
             [Fact]
-            public async Task GetContactList_NoContacts_ReturnsNotFound() //404
+            public async Task GetContactList_NoContacts_ReturnsNotFound() 
             {
                 // Arrange
                 _mockContactService.Setup(s => s.GetContactListAsync(1, 10)).ReturnsAsync((new List<ContactDto>(), 0));
@@ -220,7 +218,7 @@ namespace AddressBook.Tests.ControllerTests
             }
 
             [Fact]
-            public async Task GetContactList_ReturnsOkWithContacts() //200
+            public async Task GetContactList_ReturnsOkWithContacts() 
             {
                 // Arrange
                 var contacts = new List<ContactDto>
@@ -260,15 +258,14 @@ namespace AddressBook.Tests.ControllerTests
             public async Task GetContactList_ServiceThrowsException_Returns500()
             {
                 // Arrange
-                var mockService = new Mock<IContactService>();
                 int page = 1;
                 int pageSize = 10;
 
                 // Setup the service to throw an exception
-                mockService.Setup(s => s.GetContactListAsync(page, pageSize))
+                _mockContactService.Setup(s => s.GetContactListAsync(page, pageSize))
                            .ThrowsAsync(new Exception("Database failure"));
 
-                var controller = new ContactsController(mockService.Object, _mockMemoryCache.Object, _mockLogger.Object)
+                var controller = new ContactsController(_mockContactService.Object, _mockMemoryCache.Object, _mockLogger.Object)
                 {
                     ControllerContext = new ControllerContext
                     {
@@ -282,9 +279,9 @@ namespace AddressBook.Tests.ControllerTests
                 // Assert
                 var objectResult = Assert.IsType<ObjectResult>(result);
                 Assert.Equal(StatusCodes.Status500InternalServerError, objectResult.StatusCode);
-                Assert.Contains("An unexpected error occurred while fetching contacts", objectResult.Value.ToString());
-                Assert.Contains("GetContactList", objectResult.Value.ToString());
-            } //500
+                Assert.Contains("An unexpected error occurred while fetching contacts", objectResult?.Value?.ToString());
+                Assert.Contains("GetContactList", objectResult?.Value?.ToString());
+            } 
 
             #endregion
         }

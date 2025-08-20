@@ -106,7 +106,7 @@ namespace AddressBook.Api.Controllers
 
                 if (!_memoryCache.TryGetValue(cacheKey, out (IEnumerable<GroupDto> Items, int TotalCount) cachedResult))
                 {
-                    // Fetch from service/db
+                    // Fetch from db
                     _logger.LogInformation("Cache MISS for key={CacheKey}", cacheKey);
                     cachedResult = await _groupService.GetGroupListAsync(page, pageSize);
 

@@ -28,22 +28,7 @@ namespace AddressBook.Infrastructure.Repositories
             }
             else
             {
-                existingGroup.Name = newGroup.Name;
-                // Sync contacts if needed
-
-                /*existingGroup.Contacts.Clear();
-
-                foreach (var contact in newGroup.Contacts)
-                {
-                    var contactsToAssign = await _addressBookDbContext.Contacts
-                        .FirstOrDefaultAsync(c => c.Id == contact.Id);
-
-                    if (contactsToAssign != null)
-                        existingGroup.Contacts.Add(contactsToAssign);
-                    else
-                        existingGroup.Contacts.Add(contact); // new contact
-                }*/
-
+                existingGroup.Name = newGroup.Name;                
                 upsertStatus = UpsertStatus.Updated;
             }
             await _addressBookDbContext.SaveChangesAsync();

@@ -96,6 +96,7 @@ namespace AddressBook.Tests.ServiceTests
             // Assert
             Assert.NotNull(result);
             Assert.Single(result.ContactDto.GroupIds);
+            Assert.Equal(UpsertStatus.Created,result.Status);
         }
 
         #endregion

@@ -29,7 +29,7 @@ namespace AddressBook.Tests.ControllerTests
         #region UpsertGroup
 
         [Fact]
-        public async Task UpsertGroup_ValidGroup_ReturnsCreated() //200
+        public async Task UpsertGroup_ValidGroup_ReturnsCreated() 
         {
             // Arrange
             var groupDto = new GroupDto { Id = Guid.NewGuid(), Name = "Test Group" };
@@ -45,7 +45,7 @@ namespace AddressBook.Tests.ControllerTests
         }
 
         [Fact]
-        public async Task UpsertGroup_NullGroup_ReturnsBadRequest() //400
+        public async Task UpsertGroup_NullGroup_ReturnsBadRequest()
         {
             // Act
             var result = await _controller.UpsertGroup(null);
@@ -56,7 +56,7 @@ namespace AddressBook.Tests.ControllerTests
         }
 
         [Fact]
-        public async Task UpsertGroup_Exception_Returns500() //500
+        public async Task UpsertGroup_Exception_Returns500() 
         {
             var groupDto = new GroupDto { Name = "Error Group" };
             _mockGroupService.Setup(s => s.UpsertGroupAsync(groupDto))
@@ -75,10 +75,10 @@ namespace AddressBook.Tests.ControllerTests
         #region GetGroupById
 
         [Fact]
-        public async Task GetGroupById_ValidId_ReturnsOk() //200
+        public async Task GetGroupById_ValidId_ReturnsOk() 
         {
             var id = Guid.NewGuid();
-            var group = new GroupDto { Id = id, Name = "Group1" };
+            var group = new GroupDto { Id = id, Name = "Office" };
             _mockGroupService.Setup(s => s.GetGroupByIdAsync(id)).ReturnsAsync(group);
 
             var result = await _controller.GetGroupById(id);
@@ -88,7 +88,7 @@ namespace AddressBook.Tests.ControllerTests
         }
 
         [Fact]
-        public async Task GetGroupById_InvalidId_ReturnsBadRequest() //400
+        public async Task GetGroupById_InvalidId_ReturnsBadRequest() 
         {
             var result = await _controller.GetGroupById(Guid.Empty);
 
@@ -97,7 +97,7 @@ namespace AddressBook.Tests.ControllerTests
         }
 
         [Fact]
-        public async Task GetGroupById_NotFound_Returns404() //404
+        public async Task GetGroupById_NotFound_Returns404() 
         {
             var id = Guid.NewGuid();
             _mockGroupService.Setup(s => s.GetGroupByIdAsync(id)).ReturnsAsync((GroupDto)null);
@@ -109,7 +109,7 @@ namespace AddressBook.Tests.ControllerTests
         }
 
         [Fact]
-        public async Task GetGroupById_Exception_Returns500()  //500
+        public async Task GetGroupById_Exception_Returns500()  
         {
             var id = Guid.NewGuid();
             _mockGroupService.Setup(s => s.GetGroupByIdAsync(id)).ThrowsAsync(new Exception("DB error"));
@@ -127,7 +127,7 @@ namespace AddressBook.Tests.ControllerTests
         #region GetGroupList
 
         [Fact]
-        public async Task GetGroupList_Valid_ReturnsOkWithHeader() //200
+        public async Task GetGroupList_Valid_ReturnsOkWithHeader() 
         {
             var groups = new List<GroupDto>
             {
@@ -164,7 +164,7 @@ namespace AddressBook.Tests.ControllerTests
         }
 
         [Fact]
-        public async Task GetGroupList_InvalidPage_ReturnsBadRequest() //400
+        public async Task GetGroupList_InvalidPage_ReturnsBadRequest() 
         {
             var result = await _controller.GetGroupList(0, 0);
 
@@ -173,7 +173,7 @@ namespace AddressBook.Tests.ControllerTests
         }
 
         [Fact]
-        public async Task GetGroupList_Exception_Returns500()  //500
+        public async Task GetGroupList_Exception_Returns500() 
         {
             _mockGroupService.Setup(s => s.GetGroupListAsync(1, 10)).ThrowsAsync(new Exception("DB error"));
 
