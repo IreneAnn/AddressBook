@@ -23,7 +23,7 @@ namespace AddressBook.Api.Controllers
         }                     
 
         [HttpPost]
-        [Authorize(Policy = "WriteScope")]
+        //[Authorize(Policy = "WriteScope")]
         public async Task<IActionResult> UpsertGroup([FromBody] GroupDto groupDto)
         {
             if (groupDto == null)
@@ -54,7 +54,7 @@ namespace AddressBook.Api.Controllers
         }
 
         [HttpGet("{id:guid}")]
-        [Authorize(Policy = "ReadScope")]
+        //[Authorize(Policy = "ReadScope")]
         public async Task<IActionResult> GetGroupById(Guid id)
         {
             try
@@ -89,7 +89,7 @@ namespace AddressBook.Api.Controllers
 
 
         [HttpGet]
-        [Authorize(Policy = "ReadScope")]
+        //[Authorize(Policy = "ReadScope")]
         public async Task<IActionResult> GetGroupList([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
             try

@@ -6,8 +6,20 @@ using AddressBook.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using OpenIddict.Abstractions;
+using System.Security.Cryptography.X509Certificates;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Kestrel to listen on both HTTP and HTTPS
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(8080); // HTTP
+    options.ListenAnyIP(7255, listenOptions =>
+    {
+        listenOptions.UseHttps(); // HTTPS
+        //listenOptions.UseHttps("/https/addressbook.pfx", "password123"); // mounted PFX - docker
+    });
+});
 
 // ---------------------------
 // Add services
@@ -33,18 +45,24 @@ builder.Services.AddOpenIddict()
     .AddServer(options =>
     {
         options.SetTokenEndpointUris("/connect/token");
-
+        // options.SetIssuer(new Uri("https://host.docker.internal:7255/")); // Docker issuer
         options.AllowClientCredentialsFlow();
 
         options.AcceptAnonymousClients();
 
+        /* docker 
+        // Use persistent signing certificate instead of ephemeral keys
+        options.AddSigningCertificate(new X509Certificate2("/https/addressbook.pfx", "password123"));
+        options.AddDevelopmentEncryptionCertificate();
+        */
+
+        //local run
         // Register the signing and encryption credentials.
         options.AddDevelopmentEncryptionCertificate()
                .AddDevelopmentSigningCertificate();
+        
 
-        options.AddEphemeralEncryptionKey()
-                        .AddEphemeralSigningKey()
-                        .DisableAccessTokenEncryption();
+                      options.DisableAccessTokenEncryption();
 
         options.UseAspNetCore()
               .EnableTokenEndpointPassthrough()
@@ -57,6 +75,7 @@ builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
     {
         options.Authority = "https://localhost:7255/"; // your OpenIddict server URL
+        //options.Authority = "https://host.docker.internal:7255/"; // your OpenIddict server URL - docker
         options.RequireHttpsMetadata = false;
 
         // Token validation parameters
@@ -64,6 +83,12 @@ builder.Services.AddAuthentication("Bearer")
         {
             ValidateIssuer = true,
             ValidIssuer = "https://localhost:7255/",   // must match your token's 'iss'
+            //ValidIssuer = "https://host.docker.internal:7255/",
+            ValidIssuers = new[]
+    {
+        "https://localhost:7255/",
+        "https://host.docker.internal:7255/"
+    },
 
             ValidateAudience = true,
             ValidAudience = "addressbook.api",        // must match your token's 'aud'
@@ -163,6 +188,7 @@ builder.Services.AddSwaggerGen(c =>
             ClientCredentials = new OpenApiOAuthFlow
             {
                 TokenUrl = new Uri("https://localhost:7255/connect/token", UriKind.Absolute),
+                //TokenUrl = new Uri("https://host.docker.internal:7255/connect/token", UriKind.Absolute),
                 Scopes = new Dictionary<string, string>
             {
                 { "addressbook.read", "Read access to Address Book API" },
@@ -192,8 +218,8 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-{
+//if (app.Environment.IsDevelopment())
+//{
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
@@ -205,7 +231,7 @@ if (app.Environment.IsDevelopment())
         c.OAuthScopes("addressbook.read", "addressbook.write");
         c.OAuthUsePkce(); // optional, for auth code flow
     });
-}
+//}
 
 app.UseRouting();
 app.UseAuthentication();

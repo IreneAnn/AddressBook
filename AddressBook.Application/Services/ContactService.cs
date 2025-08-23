@@ -32,7 +32,7 @@ namespace AddressBook.Application.Services
         {
             try
             {
-                Contact contact= new Contact();
+                Contact contact= new();
                 if (contactDto.Id.HasValue)
                 {
                     contact = await _contactRepository.GetContactByIdAsync(contactDto.Id.Value) ?? new Contact();

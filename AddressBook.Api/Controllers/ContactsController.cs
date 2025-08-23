@@ -25,7 +25,7 @@ namespace AddressBook.Api.Controllers
 
 
         [HttpPost]
-        [Authorize(Policy = "WriteScope")]       
+        //[Authorize(Policy = "WriteScope")]       
         public async Task<IActionResult> UpsertContact([FromBody] ContactDto contactDto)
         {
             if (contactDto == null)
@@ -60,7 +60,7 @@ namespace AddressBook.Api.Controllers
         }
 
         [HttpGet("{id:guid}")]
-        [Authorize(Policy = "ReadScope")]
+        //[Authorize(Policy = "ReadScope")]
         public async Task<IActionResult> GetContactById(Guid id)
         {
             _logger.LogInformation("GetContactById called with id={id}", id);
@@ -92,7 +92,7 @@ namespace AddressBook.Api.Controllers
         }
 
         [HttpGet]
-        [Authorize(Policy = "ReadScope")]
+        //[Authorize(Policy = "ReadScope")]
         public async Task<IActionResult> GetContactList([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
             try
