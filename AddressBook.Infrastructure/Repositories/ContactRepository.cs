@@ -1,7 +1,8 @@
-﻿using AddressBook.Application.DTO;
+using AddressBook.Application.DTO;
 using AddressBook.Application.Interfaces.Repositories;
 using AddressBook.Domain.Entities;
-using Microsoft.EntityFrameworkCore;
+using Dapper;
+using System.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,57 +13,111 @@ namespace AddressBook.Infrastructure.Repositories
 {
     public class ContactRepository : IContactRepository
     {
-        private readonly AddressBookDbContext _addressBookDbContext;
+        private readonly DapperContext _context;
 
-        public ContactRepository(AddressBookDbContext addressBookDbContext)
+        public ContactRepository(DapperContext context)
         {
-            _addressBookDbContext = addressBookDbContext;
+            _context = context;
         }
 
         public async Task<UpsertStatus> UpsertContactAsync(Contact newContact)
         {
-            UpsertStatus upsertStatus = default;
-            var existingContact = await _addressBookDbContext.Contacts.Include(c => c.Groups).FirstOrDefaultAsync(c => c.Id == newContact.Id);
-            if (existingContact == null)
+            using var connection = _context.CreateConnection();
+            connection.Open();
+            using var transaction = connection.BeginTransaction();
+
+            if (newContact.Id == Guid.Empty)
             {
-                _addressBookDbContext.Contacts.Add(newContact);
-                upsertStatus = UpsertStatus.Created;     
+                newContact.Id = Guid.NewGuid();
+            }
+
+            var exists = await connection.ExecuteScalarAsync<int>(
+                "SELECT COUNT(1) FROM Contacts WHERE Id = @Id COLLATE NOCASE",
+                new { Id = newContact.Id.ToString() }, transaction: transaction);
+
+            UpsertStatus upsertStatus;
+            if (exists == 0)
+            {
+                const string insertSql = @"INSERT INTO Contacts (Id, FirstName, LastName, Email, PhoneNumber)
+                                            VALUES (@Id, @FirstName, @LastName, @Email, @PhoneNumber);";
+                await connection.ExecuteAsync(insertSql, newContact, transaction);
+                upsertStatus = UpsertStatus.Created;
             }
             else
             {
-                // update fields
-                existingContact.FirstName = newContact.FirstName;
-                existingContact.LastName = newContact.LastName;
-                existingContact.PhoneNumber = newContact.PhoneNumber;
-                existingContact.Email = newContact.Email;
-
-                
-                // Sync groups
-                var newGroupIds = newContact.Groups.Select(x => x.Id);  // get the group ids of the new contact
-                var groupsToAssign = await _addressBookDbContext.Groups
-                    .Where(g => newGroupIds.Contains(g.Id)) // get their corresponding groups
-                    .ToListAsync();
-               
-                existingContact.Groups.Clear();
-                    foreach (var group in groupsToAssign)
-                    existingContact.Groups.Add(group);
+                const string updateSql = @"UPDATE Contacts
+                                            SET FirstName = @FirstName,
+                                                LastName = @LastName,
+                                                Email = @Email,
+                                                PhoneNumber = @PhoneNumber
+                                            WHERE Id = @Id;";
+                await connection.ExecuteAsync(updateSql, newContact, transaction);
                 upsertStatus = UpsertStatus.Updated;
             }
-            await _addressBookDbContext.SaveChangesAsync();
+
+            // Sync groups mapping
+            const string deleteMappings = "DELETE FROM ContactGroups WHERE ContactsId = @Id COLLATE NOCASE";
+            await connection.ExecuteAsync(deleteMappings, new { Id = newContact.Id.ToString() }, transaction);
+
+            if (newContact.Groups != null && newContact.Groups.Any())
+            {
+                const string insertMapping = "INSERT INTO ContactGroups (ContactsId, GroupsId) VALUES (@ContactsId, @GroupsId)";
+                var mappingParams = newContact.Groups
+                    .Select(g => g.Id)
+                    .Distinct()
+                    .Select(id => new { ContactsId = newContact.Id, GroupsId = id });
+                await connection.ExecuteAsync(insertMapping, mappingParams, transaction);
+            }
+
+            transaction.Commit();
             return upsertStatus;
         }
 
         public async Task<Contact?> GetContactByIdAsync(Guid id)
         {
-            return await _addressBookDbContext.Contacts.Include(c => c.Groups).FirstOrDefaultAsync(c => c.Id == id);
+            using var connection = _context.CreateConnection();
+            connection.Open();
+
+            const string contactSql = @"SELECT Id, FirstName, LastName, Email, PhoneNumber
+                                         FROM Contacts WHERE Id = @Id COLLATE NOCASE";
+            var contact = await connection.QuerySingleOrDefaultAsync<Contact>(contactSql, new { Id = id.ToString() });
+            if (contact == null)
+                return null;
+
+            const string groupsSql = @"SELECT g.Id, g.Name
+                                       FROM Groups g
+                                       INNER JOIN ContactGroups cg ON g.Id = cg.GroupsId
+                                       WHERE cg.ContactsId = @Id COLLATE NOCASE";
+            var groups = await connection.QueryAsync<Group>(groupsSql, new { Id = id.ToString() });
+            contact.Groups = groups.ToList();
+            return contact;
         }
 
         public async Task<(IEnumerable<Contact> Items, int Total)> GetContactListAsync(int page, int pageSize)
         {
-            var contactList = _addressBookDbContext.Contacts.Include(c => c.Groups).OrderBy(c => c.FirstName);
-            var contactListCount = await contactList.CountAsync();
-            var list = await contactList.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
-            return (list, contactListCount);
+            using var connection = _context.CreateConnection();
+            connection.Open();
+
+            var total = await connection.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM Contacts");
+
+            var limit = pageSize;
+            var offset = (page - 1) * pageSize;
+            var items = (await connection.QueryAsync<Contact>(
+                "SELECT Id, FirstName, LastName, Email, PhoneNumber FROM Contacts ORDER BY FirstName LIMIT @limit OFFSET @offset",
+                new { limit, offset })).ToList();
+
+            // Load groups for each contact (simple and clear; acceptable for small page sizes)
+            const string groupsSql = @"SELECT g.Id, g.Name
+                                       FROM Groups g
+                                       INNER JOIN ContactGroups cg ON g.Id = cg.GroupsId
+                                       WHERE cg.ContactsId = @Id";
+            foreach (var c in items)
+            {
+                var groups = await connection.QueryAsync<Group>(groupsSql, new { Id = c.Id.ToString() });
+                c.Groups = groups.ToList();
+            }
+
+            return (items, total);
         }
     }
    

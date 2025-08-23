@@ -15,7 +15,7 @@ namespace AddressBook.Infrastructure.Migrations
                 name: "Contacts",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Id = table.Column<Guid>(type: "TEXT COLLATE NOCASE", nullable: false),
                     FirstName = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
                     LastName = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
                     Email = table.Column<string>(type: "TEXT", nullable: false),
@@ -30,7 +30,7 @@ namespace AddressBook.Infrastructure.Migrations
                 name: "Groups",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "TEXT", nullable: false),
+                    Id = table.Column<Guid>(type: "TEXT COLLATE NOCASE", nullable: false),
                     Name = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false)
                 },
                 constraints: table =>
@@ -42,8 +42,8 @@ namespace AddressBook.Infrastructure.Migrations
                 name: "ContactGroups",
                 columns: table => new
                 {
-                    ContactsId = table.Column<Guid>(type: "TEXT", nullable: false),
-                    GroupsId = table.Column<Guid>(type: "TEXT", nullable: false)
+                    ContactsId = table.Column<Guid>(type: "TEXT COLLATE NOCASE", nullable: false),
+                    GroupsId = table.Column<Guid>(type: "TEXT COLLATE NOCASE", nullable: false)
                 },
                 constraints: table =>
                 {

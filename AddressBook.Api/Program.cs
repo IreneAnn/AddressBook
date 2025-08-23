@@ -3,6 +3,7 @@ using AddressBook.Application.Interfaces.Services;
 using AddressBook.Application.Services;
 using AddressBook.Infrastructure;
 using AddressBook.Infrastructure.Repositories;
+using Dapper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using OpenIddict.Abstractions;
@@ -24,6 +25,11 @@ builder.WebHost.ConfigureKestrel(options =>
 // ---------------------------
 // Add services
 // ---------------------------
+
+//Dapper
+builder.Services.AddSingleton<DapperContext>();
+// Register Guid handler for Dapper
+SqlMapper.AddTypeHandler(new GuidTypeHandler());
 
 // SQLite DB
 var conn = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=addressbook.db";
