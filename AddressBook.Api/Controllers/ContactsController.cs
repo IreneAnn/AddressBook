@@ -1,9 +1,9 @@
-﻿using AddressBook.Application.DTO;
+using AddressBook.Application.DTO;
 using AddressBook.Application.Interfaces.Services;
 using AddressBook.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace AddressBook.Api.Controllers
@@ -13,12 +13,10 @@ namespace AddressBook.Api.Controllers
     public class ContactsController : ControllerBase
     {
         private readonly IContactService _contactService;
-        private readonly IMemoryCache _memoryCache;
         private readonly ILogger<ContactsController> _logger;
-        public ContactsController(IContactService contactService,IMemoryCache memoryCache, ILogger<ContactsController> logger)
+        public ContactsController(IContactService contactService, ILogger<ContactsController> logger)
         {
             _contactService = contactService;            
-            _memoryCache = memoryCache;
             _logger = logger;
         }
 
@@ -105,26 +103,7 @@ namespace AddressBook.Api.Controllers
                     return BadRequest("Page and pageSize must be greater than zero.");
                 }
 
-                // Generate a cache key unique per user and query parameters
-                var cacheKey = $"contacts_{User?.Identity?.Name}_{page}_{pageSize}";
-
-                if (!_memoryCache.TryGetValue(cacheKey, out (IEnumerable<ContactDto> Items, int Total) cachedResult))
-                {
-                    _logger.LogInformation("Cache MISS for key {CacheKey}", cacheKey);
-                    cachedResult = await _contactService.GetContactListAsync(page, pageSize);
-
-                    // Cache options: expire after 60 seconds
-                    var cacheOptions = new MemoryCacheEntryOptions
-                    {
-                        AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(60)
-                    };
-
-                    _memoryCache.Set(cacheKey, cachedResult, cacheOptions);
-                }
-                else
-                {
-                    _logger.LogInformation("Cache HIT for key {CacheKey}", cacheKey);
-                }
+                var cachedResult = await _contactService.GetContactListAsync(page, pageSize);
 
                 if (cachedResult.Total == 0)
                 {

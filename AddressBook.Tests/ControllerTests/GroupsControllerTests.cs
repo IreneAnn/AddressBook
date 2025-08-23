@@ -1,11 +1,10 @@
-﻿using AddressBook.Api.Controllers;
+using AddressBook.Api.Controllers;
 using AddressBook.Application;
 using AddressBook.Application.DTO;
 using AddressBook.Application.Interfaces.Services;
 using AddressBook.Domain.Entities;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -14,16 +13,14 @@ namespace AddressBook.Tests.ControllerTests
     public class GroupsControllerTests
     {
         private readonly Mock<IGroupService> _mockGroupService;
-        private readonly Mock<IMemoryCache> _mockCache;
         private readonly Mock<ILogger<GroupsController>> _mockLogger;
         private readonly GroupsController _controller;
 
         public GroupsControllerTests()
         {
             _mockGroupService = new Mock<IGroupService>();
-            _mockCache = new Mock<IMemoryCache>();
             _mockLogger = new Mock<ILogger<GroupsController>>();
-            _controller = new GroupsController(_mockGroupService.Object, _mockCache.Object, _mockLogger.Object);
+            _controller = new GroupsController(_mockGroupService.Object, _mockLogger.Object);
         }
        
         #region UpsertGroup
@@ -140,13 +137,6 @@ namespace AddressBook.Tests.ControllerTests
 
             _mockGroupService.Setup(s => s.GetGroupListAsync(page, pageSize))
                 .ReturnsAsync((groups, totalCount));
-
-            object cacheEntry = null;
-            _mockCache.Setup(m => m.TryGetValue(It.IsAny<object>(), out cacheEntry))
-                     .Returns(false);
-
-            _mockCache.Setup(m => m.CreateEntry(It.IsAny<object>()))
-                     .Returns(Mock.Of<ICacheEntry>());
 
             // Initialize ControllerContext
             _controller.ControllerContext = new ControllerContext

@@ -1,8 +1,9 @@
-﻿using AddressBook.Application.DTO;
+using AddressBook.Application.DTO;
 using AddressBook.Application.Interfaces.Repositories;
 using AddressBook.Application.Interfaces.Services;
 using AddressBook.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -20,11 +21,13 @@ namespace AddressBook.Application.Services
     {
         private readonly IContactRepository _contactRepository;
         private readonly IGroupRepository _groupRepository;
+        private readonly IMemoryCache _cache;
         private readonly ILogger<ContactService> _logger;
-        public ContactService(IContactRepository contactRepository,IGroupRepository groupRepository, ILogger<ContactService> logger)
+        public ContactService(IContactRepository contactRepository,IGroupRepository groupRepository, IMemoryCache cache, ILogger<ContactService> logger)
         {
             _contactRepository = contactRepository;
             _groupRepository = groupRepository;
+            _cache = cache;
             _logger = logger;
         }
 
@@ -105,20 +108,34 @@ namespace AddressBook.Application.Services
 
             try
             {
-                var (items, contactListCount) = await _contactRepository.GetContactListAsync(page, pageSize);
-
-                var dtos = items.Select(c => new ContactDto
+                var cacheKey = $"contacts_{page}_{pageSize}";
+                if (!_cache.TryGetValue(cacheKey, out (IEnumerable<ContactDto> Items, int Total) cached))
                 {
-                    Id = c.Id,
-                    FirstName = c.FirstName,
-                    LastName = c.LastName,
-                    PhoneNumber = c.PhoneNumber,
-                    Email = c.Email,
-                    GroupIds = c.Groups.Select(g => g.Id)
-                });
+                    var (items, total) = await _contactRepository.GetContactListAsync(page, pageSize);
+                    var dtos = items.Select(c => new ContactDto
+                    {
+                        Id = c.Id,
+                        FirstName = c.FirstName,
+                        LastName = c.LastName,
+                        PhoneNumber = c.PhoneNumber,
+                        Email = c.Email,
+                        GroupIds = c.Groups.Select(g => g.Id)
+                    });
 
-                _logger.LogInformation("Fetched {Count} contacts out of total {TotalCount}", dtos.Count(), contactListCount);
-                return (dtos, contactListCount);
+                    cached = (dtos.ToList(), total);
+                    _cache.Set(cacheKey, cached, new MemoryCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(60)
+                    });
+                    _logger.LogInformation("Cache MISS for {CacheKey}. Stored {Count} items of {Total}", cacheKey, cached.Items.Count(), cached.Total);
+                }
+                else
+                {
+                    _logger.LogInformation("Cache HIT for {CacheKey}", cacheKey);
+                }
+
+                _logger.LogInformation("Fetched {Count} contacts out of total {TotalCount}", cached.Items.Count(), cached.Total);
+                return cached;
             }
             catch (Exception ex)
             {

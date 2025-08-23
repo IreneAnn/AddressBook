@@ -1,8 +1,9 @@
-﻿using AddressBook.Application.DTO;
+using AddressBook.Application.DTO;
 using AddressBook.Application.Interfaces.Repositories;
 using AddressBook.Application.Services;
 using AddressBook.Domain.Entities;
 using Castle.Core.Logging;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System;
@@ -17,6 +18,7 @@ namespace AddressBook.Tests.ServiceTests
     {
         private readonly Mock<IContactRepository> _mockContactRepo;
         private readonly Mock<IGroupRepository> _mockGroupRepo;
+        private readonly Mock<IMemoryCache> _mockCache;
         private readonly Mock<ILogger<ContactService>> _mockLogger;
         private readonly ContactService _service;
 
@@ -24,8 +26,19 @@ namespace AddressBook.Tests.ServiceTests
         {
             _mockContactRepo = new Mock<IContactRepository>();
             _mockGroupRepo = new Mock<IGroupRepository>();
+            _mockCache = new Mock<IMemoryCache>();
             _mockLogger = new Mock<ILogger<ContactService>>();
-            _service = new ContactService(_mockContactRepo.Object, _mockGroupRepo.Object, _mockLogger.Object);
+
+            // Default cache behavior: miss, and Set returns the provided value
+            object? cacheEntry = null;
+            _mockCache.Setup(m => m.TryGetValue(It.IsAny<object>(), out cacheEntry))
+                      .Returns(false);
+            var mockEntry = new Mock<ICacheEntry>();
+            mockEntry.SetupAllProperties();
+            _mockCache.Setup(m => m.CreateEntry(It.IsAny<object>()))
+                      .Returns(mockEntry.Object);
+
+            _service = new ContactService(_mockContactRepo.Object, _mockGroupRepo.Object, _mockCache.Object, _mockLogger.Object);
         }
 
         #region UpsertContactAsync Tests

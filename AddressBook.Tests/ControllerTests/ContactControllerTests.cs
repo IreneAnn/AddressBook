@@ -6,7 +6,6 @@ using AddressBook.Domain.Entities;
 using Castle.Core.Logging;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -17,16 +16,14 @@ namespace AddressBook.Tests.ControllerTests
         public class ContactsControllerTests
         {
             private readonly Mock<IContactService> _mockContactService;
-            private readonly Mock<IMemoryCache> _mockMemoryCache;
             private readonly Mock<ILogger<ContactsController>> _mockLogger;
             private readonly ContactsController _controller;
 
             public ContactsControllerTests()
             {
                 _mockContactService = new Mock<IContactService>();
-                _mockMemoryCache = new Mock<IMemoryCache>();
                 _mockLogger = new Mock<ILogger<ContactsController>>();
-                _controller = new ContactsController(_mockContactService.Object, _mockMemoryCache.Object, _mockLogger.Object);
+                _controller = new ContactsController(_mockContactService.Object, _mockLogger.Object);
             }
 
             #region UpsertContact
@@ -96,7 +93,7 @@ namespace AddressBook.Tests.ControllerTests
                 mockService.Setup(s => s.UpsertContactAsync(It.IsAny<ContactDto>()))
                            .ThrowsAsync(new Exception("Database failure"));
 
-                var controller = new ContactsController(mockService.Object, _mockMemoryCache.Object, _mockLogger.Object);
+                var controller = new ContactsController(mockService.Object, _mockLogger.Object);
 
                 // Act
                 var result = await controller.UpsertContact(sampleDto);
@@ -165,7 +162,7 @@ namespace AddressBook.Tests.ControllerTests
                 _mockContactService.Setup(s => s.GetContactByIdAsync(It.IsAny<Guid>()))
                            .ThrowsAsync(new Exception("An unexpected error occurred in GetContactById"));
 
-                var controller = new ContactsController(_mockContactService.Object, _mockMemoryCache.Object, _mockLogger.Object);
+                var controller = new ContactsController(_mockContactService.Object, _mockLogger.Object);
 
                 // Act
                 var result = await controller.GetContactById(contactId);
@@ -206,13 +203,6 @@ namespace AddressBook.Tests.ControllerTests
                 new ContactDto { Id = Guid.NewGuid(), FirstName = "Jane", LastName = "Smith" }
             };
 
-                object cacheEntry = null;
-                _mockMemoryCache.Setup(m => m.TryGetValue(It.IsAny<object>(), out cacheEntry))
-                         .Returns(false);
-
-                _mockMemoryCache.Setup(m => m.CreateEntry(It.IsAny<object>()))
-                         .Returns(Mock.Of<ICacheEntry>());
-
                 _mockContactService.Setup(s => s.GetContactListAsync(1, 10))
                     .ReturnsAsync((contacts, contacts.Count));
 
@@ -244,7 +234,7 @@ namespace AddressBook.Tests.ControllerTests
                 _mockContactService.Setup(s => s.GetContactListAsync(page, pageSize))
                            .ThrowsAsync(new Exception("Database failure"));
 
-                var controller = new ContactsController(_mockContactService.Object, _mockMemoryCache.Object, _mockLogger.Object)
+                var controller = new ContactsController(_mockContactService.Object, _mockLogger.Object)
                 {
                     ControllerContext = new ControllerContext
                     {

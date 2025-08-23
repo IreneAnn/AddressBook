@@ -1,9 +1,8 @@
-﻿using AddressBook.Application.DTO;
+using AddressBook.Application.DTO;
 using AddressBook.Application.Interfaces.Services;
 using AddressBook.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json;
 
 namespace AddressBook.Api.Controllers
@@ -13,12 +12,10 @@ namespace AddressBook.Api.Controllers
     public class GroupsController : ControllerBase
     {
         private readonly IGroupService _groupService;
-        private readonly IMemoryCache _memoryCache;
         private readonly ILogger<GroupsController> _logger;
-        public GroupsController(IGroupService groupService,IMemoryCache memoryCache, ILogger<GroupsController> logger)
+        public GroupsController(IGroupService groupService, ILogger<GroupsController> logger)
         {
             _groupService = groupService;
-            _memoryCache = memoryCache;
             _logger = logger;
         }                     
 
@@ -102,38 +99,19 @@ namespace AddressBook.Api.Controllers
                     return BadRequest("Page and PageSize must be greater than zero."); 
                 }
 
-                string cacheKey = $"GroupList_{page}_{pageSize}";
+                var cachedResult = await _groupService.GetGroupListAsync(page, pageSize);
 
-                if (!_memoryCache.TryGetValue(cacheKey, out (IEnumerable<GroupDto> Items, int TotalCount) cachedResult))
-                {
-                    // Fetch from db
-                    _logger.LogInformation("Cache MISS for key={CacheKey}", cacheKey);
-                    cachedResult = await _groupService.GetGroupListAsync(page, pageSize);
-
-                    // Set cache options
-                    var cacheOptions = new MemoryCacheEntryOptions
-                    {
-                        AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(60)
-                    };
-
-                    _memoryCache.Set(cacheKey, cachedResult, cacheOptions);                    
-                }
-                else
-                {
-                    _logger.LogInformation("Cache HIT for key={CacheKey}", cacheKey);
-                }
-
-                if (cachedResult.TotalCount == 0)
+                if (cachedResult.Total == 0)
                 {
                     _logger.LogInformation("No groups found for page={Page} pageSize={PageSize}", page, pageSize);
                 }
 
                 Response.Headers.Append("X-Pagination", JsonSerializer.Serialize(new
                 {
-                    cachedResult.TotalCount,
+                    cachedResult.Total,
                     pageSize,
                     currentPage = page,
-                    totalPages = (int)Math.Ceiling(cachedResult.TotalCount / (double)pageSize)
+                    totalPages = (int)Math.Ceiling(cachedResult.Total / (double)pageSize)
                 }));
 
                 _logger.LogInformation("Returning {Count} groups for page={Page} pageSize={PageSize}", cachedResult.Items.Count(), page, pageSize);

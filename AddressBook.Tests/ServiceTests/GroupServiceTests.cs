@@ -1,7 +1,8 @@
-﻿using AddressBook.Application.DTO;
+using AddressBook.Application.DTO;
 using AddressBook.Application.Interfaces.Repositories;
 using AddressBook.Application.Services;
 using AddressBook.Domain.Entities;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 using Moq;
 
@@ -10,14 +11,26 @@ namespace AddressBook.Tests.ServiceTests
     public class GroupServiceTests
     {
         private readonly Mock<IGroupRepository> _mockRepo;
+        private readonly Mock<IMemoryCache> _mockCache;
         private readonly Mock<ILogger<GroupService>> _mockLogger;
         private readonly GroupService _service;
 
         public GroupServiceTests()
         {
             _mockRepo = new Mock<IGroupRepository>();
+            _mockCache = new Mock<IMemoryCache>();
             _mockLogger = new Mock<ILogger<GroupService>>();
-            _service = new GroupService(_mockRepo.Object, _mockLogger.Object);
+            
+            // Default cache behavior: miss; CreateEntry returns a mock entry
+            object? cacheEntry = null;
+            _mockCache.Setup(m => m.TryGetValue(It.IsAny<object>(), out cacheEntry))
+                      .Returns(false);
+            var mockEntry = new Mock<ICacheEntry>();
+            mockEntry.SetupAllProperties();
+            _mockCache.Setup(m => m.CreateEntry(It.IsAny<object>()))
+                      .Returns(mockEntry.Object);
+
+            _service = new GroupService(_mockRepo.Object, _mockCache.Object, _mockLogger.Object);
         }
 
         [Fact]
