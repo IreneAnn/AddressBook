@@ -1,13 +1,14 @@
 # AddressBook
 ## AddressBook — Clean Architecture Web API (.NET 9)
 
-A layered Address Book Web API with Contacts and Groups, using EF Core (SQLite), OpenIddict-based OAuth/OpenID Connect server scaffolding, Swagger, and unit tests.
+A layered Address Book Web API with Contacts and Groups, using SQLite with Dapper for application data access, OpenIddict-based OAuth/OpenID Connect server scaffolding (EF Core used for OpenIddict/migrations), Swagger, and unit tests.
 
 ### Features
 - Contacts and Groups CRUD-like endpoints (create/update via upsert, get by id, paged list)
 - Many-to-many relation between contacts and groups
 - Pagination with X-Pagination response header
-- EF Core 9 + SQLite with automatic migrations on startup
+- SQLite with Dapper repositories for application data (Contacts/Groups)
+- EF Core is used for OpenIddict stores and schema migrations; runtime data access for Contacts/Groups uses Dapper repositories
 - OpenIddict server configured (token endpoint; client credentials flow implemented)
 - JWT Bearer authentication configured (Authority/Audience validation; see Auth section)
 - Swagger/OpenAPI UI in development with OAuth2 (client credentials) security scheme
@@ -20,13 +21,22 @@ A layered Address Book Web API with Contacts and Groups, using EF Core (SQLite),
 - `AddressBook.Api/` — ASP.NET Core Web API, DI, EF/OpenIddict setup, controllers, Swagger
 - `AddressBook.Application/` — DTOs, interfaces, and services (business logic)
 - `AddressBook.Domain/` — entities (`Contact`, `Group`) and enums (`UpsertStatus`)
-- `AddressBook.Infrastructure/` — EF Core DbContext and repositories
+- `AddressBook.Infrastructure/` — Dapper context and repositories for app data; EF Core DbContext is retained for OpenIddict and migrations
 - `AddressBook.Tests/` — xUnit tests for controllers and services
+
+## Data access: Dapper vs EF Core
+- Runtime data access for Contacts/Groups uses Dapper repositories for lean, explicit SQL and control over queries.
+- EF Core remains for OpenIddict stores and for schema migrations (including Contacts/Groups tables). Repositories do not use EF at runtime.
+- Repositories: `AddressBook.Infrastructure/Repositories/ContactRepository.cs`, `AddressBook.Infrastructure/Repositories/GroupRepository.cs`
+- Context and setup: `AddressBook.Infrastructure/DapperContext.cs`, `AddressBook.Infrastructure/DapperTypeHandlers.cs`
+- Schema: `AddressBook.Infrastructure/AddressBookDbContext.cs` and `AddressBook.Infrastructure/Migrations/`
+
+---
 
 ## Domain model
 - `Contact`: `Id`, `FirstName`, `LastName`, `Email`, `PhoneNumber`, `Groups`
 - `Group`: `Id`, `Name`, `Contacts`
-- Relationship: many-to-many (`ContactGroups` join table configured in `AddressBookDbContext`)
+- Relationship: many-to-many via `ContactGroups` join table
 - `UpsertStatus`: `None | Created | Updated`
 
 ---
@@ -49,6 +59,47 @@ Database: SQLite file `addressbook.db` created under `AddressBook.Api/`.
 Connection string: taken from `ConnectionStrings:DefaultConnection` if present, otherwise defaults to `Data Source=addressbook.db`.
 
 ---
+## Docker
+
+![Alt text](images/docker_build_push.png?raw=true "Docker Build Push")
+
+Build image (local):
+```bash
+docker build -t irene22/address-book-api:latest .
+```
+
+Run container (maps HTTPS 7255 and HTTP 8080):
+```bash
+docker run -p 7255:7255 -p 8080:8080 --name address-book-api irene22/address-book-api:latest
+```
+
+Push image (already pushed by maintainer):
+```bash
+docker push irene22/address-book-api:latest
+```
+
+Pull from Docker Hub:
+```bash
+docker pull irene22/address-book-api:latest
+```
+
+Docker Hub: https://hub.docker.com/r/irene22/address-book-api/tags
+
+Note: The image is already pushed to Docker Hub. Users can pull and run directly using the commands above.
+
+---
+## CI/CD (GitHub Actions)
+- Workflow file: `.github/workflows/docker-publish.yml`
+- Trigger: runs on every `push` to any branch.
+- Steps:
+  - Login to Docker Hub using `DOCKER_USERNAME` and `DOCKER_PASSWORD` secrets.
+  - Build image: `docker build -t irene22/address-book-api:latest .`
+  - Push image: `docker push irene22/address-book-api:latest`
+
+To enable:
+- Add repo secrets `DOCKER_USERNAME` and `DOCKER_PASSWORD` in GitHub > Settings > Secrets and variables > Actions.
+
+---
 ## Swagger/OpenAPI
 - Enabled in development via `AddEndpointsApiExplorer()` and `AddSwaggerGen()`; UI available at `/swagger` on your chosen base URL.
 - OAuth2 Client Credentials is configured (security scheme `oauth2`) with scopes `addressbook.read` and `addressbook.write`.
@@ -59,7 +110,9 @@ Connection string: taken from `ConnectionStrings:DefaultConnection` if present, 
 	- select scopes -
     - **Write scope** :'addressbook.read addressbook.write'
     - **Read scope** : 'addressbook.read'
-	  
+
+![Alt text](images/swagger.png?raw=true "Swagger")
+
 ## API endpoints
 
 ### Contacts (`AddressBook.Api/Controllers/ContactsController.cs`)
@@ -71,14 +124,14 @@ Connection string: taken from `ConnectionStrings:DefaultConnection` if present, 
 - GET `/api/contacts?page=1&pageSize=10` — Paged contact list
   - Returns `X-Pagination` header: `Total`, `pageSize`, `currentPage`, `totalPages`
   - Returns 200 OK with empty array when no data
-  - Note: Cache key includes the user's identity. With client-credentials tokens `User?.Identity?.Name` is typically null, so keys may be shared across clients (same key). Consider including client_id/subject in the key or switch to distributed cache.
+  - Note: Cache key is per page/pageSize. Results are shared across clients that request the same page and size; consider including client_id/subject in the key or using distributed cache if needed.
 
 ### Groups (`AddressBook.Api/Controllers/GroupsController.cs`)
 - Secured via [Authorize] policies: `WriteScope` for POST, `ReadScope` for GET
 - POST `/api/groups` — Upsert group
 - GET `/api/groups/{id:guid}` — Get group by id
 - GET `/api/groups?page=1&pageSize=10` — Paged group list with `X-Pagination`
-  - Returns `X-Pagination` header: `TotalCount`, `pageSize`, `currentPage`, `totalPages`
+  - Returns `X-Pagination` header: `Total`, `pageSize`, `currentPage`, `totalPages`
 
 ### Sample payloads
 Create/Update contact
@@ -138,8 +191,8 @@ Note:
 
 ## Caching
 Current status: In-memory caching implemented for list endpoints (TTL 60s).
-- `ContactsController.GetContactList()`: key is `contacts_{User?.Identity?.Name}_{page}_{pageSize}`
-- `GroupsController.GetGroupList()`: key is `GroupList_{page}_{pageSize}`
+- `ContactService.GetContactListAsync()`: key is `contacts_{page}_{pageSize}`
+- `GroupService.GetGroupListAsync()`: key is `groups_{page}_{pageSize}`
 Notes:
 - Cache is per-process. Use `IDistributedCache`/Redis for multi-instance deployments.
 
@@ -167,10 +220,10 @@ dotnet test
 - AcceptAnonymousClients vs ClientId: `AcceptAnonymousClients()` is enabled, but `AuthorizationController.Exchange()` requires `request.ClientId` (throws if null). Remove anonymous clients or handle missing client IDs.
 - Dev-only settings: `RequireHttpsMetadata = false`, development certs, and `DisableAccessTokenEncryption()` are for local/dev only.
 - Secrets in code: Client secret appears in `SeedOpenIddictClients()` and Swagger UI OAuth config. Move to configuration/user-secrets.
-- Cache key collisions: `ContactsController` cache key uses `User?.Identity?.Name`; with client-credentials this is null and may cause cross-client cache sharing.
+- Cache scope: Cache keys are per `page`/`pageSize` and shared across clients for list endpoints. Consider including client_id/tenant in keys or using distributed cache.
 - No cache invalidation on writes; consider eviction strategy or cache busting.
 - Minimal DTO validation; add data annotations or FluentValidation and consistent ProblemDetails responses.
-- Read performance: consider `AsNoTracking()` and projection for read-only queries.
+- Read performance: with Dapper, queries are non-tracking by default. Consider selecting only needed columns and projecting directly to DTOs.
 - Security hardening: add CORS, rate limiting, audit logging.
 - Observability: health checks, correlation IDs, OpenTelemetry for traces/metrics.
 
@@ -183,7 +236,8 @@ dotnet test
 - Auth/DI/Swagger: `AddressBook.Api/Program.cs`
 - Token issuance: `AddressBook.Api/Controllers/AuthorizationController.cs`
 - Controllers: `AddressBook.Api/Controllers/*`
-- EF Core: `AddressBook.Infrastructure/AddressBookDbContext.cs`, `AddressBook.Infrastructure/Repositories/*`
+- Dapper (app data): `AddressBook.Infrastructure/DapperContext.cs`, `AddressBook.Infrastructure/Repositories/*`
+- EF Core (OpenIddict + schema/migrations): `AddressBook.Infrastructure/AddressBookDbContext.cs`
 - DTOs: `AddressBook.Application/DTO/*`
 
 AddressBook
