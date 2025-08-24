@@ -1,4 +1,4 @@
-﻿using AddressBook.Application.Interfaces.Repositories;
+using AddressBook.Application.Interfaces.Repositories;
 using AddressBook.Application.Interfaces.Services;
 using AddressBook.Application.Services;
 using AddressBook.Infrastructure;
@@ -8,6 +8,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using OpenIddict.Abstractions;
 using System.Security.Cryptography.X509Certificates;
+using System.Net.Http;
+using System.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,8 +19,17 @@ builder.WebHost.ConfigureKestrel(options =>
     options.ListenAnyIP(8080); // HTTP
     options.ListenAnyIP(7255, listenOptions =>
     {
-        listenOptions.UseHttps(); // HTTPS
-        //listenOptions.UseHttps("/https/addressbook.pfx", "password123"); // mounted PFX - docker
+        // Prefer mounted PFX in Docker; fallback to dev cert
+        var pfxPath = "/https/addressbook.pfx";
+        var pfxPassword = "password123";
+        if (File.Exists(pfxPath))
+        {
+            listenOptions.UseHttps(pfxPath, pfxPassword);
+        }
+        else
+        {
+            listenOptions.UseHttps(); // dev cert
+        }
     });
 });
 
@@ -29,7 +40,7 @@ builder.WebHost.ConfigureKestrel(options =>
 //Dapper
 builder.Services.AddSingleton<DapperContext>();
 // Register Guid handler for Dapper
-SqlMapper.AddTypeHandler(new GuidTypeHandler());
+SqlMapper.AddTypeHandler(new AddressBook.Infrastructure.GuidTypeHandler());
 
 // SQLite DB
 var conn = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=addressbook.db";
@@ -51,21 +62,25 @@ builder.Services.AddOpenIddict()
     .AddServer(options =>
     {
         options.SetTokenEndpointUris("/connect/token");
-        // options.SetIssuer(new Uri("https://host.docker.internal:7255/")); // Docker issuer
+        // Use a fixed HTTPS issuer for both dev and docker (port must be published)
+        options.SetIssuer(new Uri("https://localhost:7255/"));
         options.AllowClientCredentialsFlow();
 
         options.AcceptAnonymousClients();
 
-        /* docker 
-        // Use persistent signing certificate instead of ephemeral keys
-        options.AddSigningCertificate(new X509Certificate2("/https/addressbook.pfx", "password123"));
-        options.AddDevelopmentEncryptionCertificate();
-        */
-
-        //local run
-        // Register the signing and encryption credentials.
-        options.AddDevelopmentEncryptionCertificate()
-               .AddDevelopmentSigningCertificate();
+        // Prefer persistent signing cert in Docker, otherwise dev certs
+        var pfxPath = "/https/addressbook.pfx";
+        var pfxPassword = "password123";
+        if (File.Exists(pfxPath))
+        {
+            options.AddSigningCertificate(new X509Certificate2(pfxPath, pfxPassword));
+            options.AddDevelopmentEncryptionCertificate();
+        }
+        else
+        {
+            options.AddDevelopmentEncryptionCertificate()
+                   .AddDevelopmentSigningCertificate();
+        }
         
 
                       options.DisableAccessTokenEncryption();
@@ -80,21 +95,26 @@ builder.Services.AddOpenIddict()
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
     {
-        options.Authority = "https://localhost:7255/"; // your OpenIddict server URL
-        //options.Authority = "https://host.docker.internal:7255/"; // your OpenIddict server URL - docker
-        options.RequireHttpsMetadata = false;
+        options.Authority = "https://localhost:7255/"; // same as SetIssuer
+        // In dev/docker, HTTPS uses a self-signed cert. Allow untrusted certs for metadata in Development.
+        if (builder.Environment.IsDevelopment())
+        {
+            options.RequireHttpsMetadata = false; // allow http/invalid cert for metadata
+            options.BackchannelHttpHandler = new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            };
+        }
+        else
+        {
+            options.RequireHttpsMetadata = true;
+        }
 
         // Token validation parameters
         options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = "https://localhost:7255/",   // must match your token's 'iss'
-            //ValidIssuer = "https://host.docker.internal:7255/",
-            ValidIssuers = new[]
-    {
-        "https://localhost:7255/",
-        "https://host.docker.internal:7255/"
-    },
+            ValidIssuer = "https://localhost:7255/",   // must match token 'iss'
 
             ValidateAudience = true,
             ValidAudience = "addressbook.api",        // must match your token's 'aud'
@@ -194,7 +214,6 @@ builder.Services.AddSwaggerGen(c =>
             ClientCredentials = new OpenApiOAuthFlow
             {
                 TokenUrl = new Uri("https://localhost:7255/connect/token", UriKind.Absolute),
-                //TokenUrl = new Uri("https://host.docker.internal:7255/connect/token", UriKind.Absolute),
                 Scopes = new Dictionary<string, string>
             {
                 { "addressbook.read", "Read access to Address Book API" },
@@ -232,8 +251,8 @@ var app = builder.Build();
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "AddressBook API v1");
 
         // OAuth2 Client Credentials setup
-        c.OAuthClientId("addressbook.client");
-        c.OAuthClientSecret("secret");
+        c.OAuthClientId(builder.Configuration["Auth:ClientId"] ?? "addressbook.client");
+        c.OAuthClientSecret(builder.Configuration["Auth:ClientSecret"] ?? "secret");
         c.OAuthScopes("addressbook.read", "addressbook.write");
         c.OAuthUsePkce(); // optional, for auth code flow
     });
@@ -256,10 +275,17 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
 
     var manager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
-    await SeedOpenIddictClients(manager);
+    var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+    var clientId = config["Auth:ClientId"] ?? "addressbook.client";
+    var clientSecret = config["Auth:ClientSecret"] ?? "secret";
+    await SeedOpenIddictClients(manager, clientId, clientSecret);
 
     var scopeManager = scope.ServiceProvider.GetRequiredService<IOpenIddictScopeManager>();
     await SeedOpenIddictScopes(scopeManager);
+
+    // Seed app data using Dapper, not EF
+    var dapper = scope.ServiceProvider.GetRequiredService<DapperContext>();
+    await SeedAppData(dapper);
 }
 
 app.Run();
@@ -289,14 +315,14 @@ static async Task SeedOpenIddictScopes(IOpenIddictScopeManager scopeManager)
 }
 
 
-static async Task SeedOpenIddictClients(IOpenIddictApplicationManager manager)
+static async Task SeedOpenIddictClients(IOpenIddictApplicationManager manager, string clientId, string clientSecret)
 {
-    if (await manager.FindByClientIdAsync("addressbook.client") == null)
+    if (await manager.FindByClientIdAsync(clientId) == null)
     {
         await manager.CreateAsync(new OpenIddictApplicationDescriptor
         {
-            ClientId = "addressbook.client",
-            ClientSecret = "secret",
+            ClientId = clientId,
+            ClientSecret = clientSecret,
             DisplayName = "AddressBook Test Client",
             Permissions =
             {
@@ -306,6 +332,62 @@ static async Task SeedOpenIddictClients(IOpenIddictApplicationManager manager)
                 OpenIddictConstants.Permissions.Prefixes.Scope + "addressbook.write"
             }
         });
+    }
+}
+
+static async Task SeedAppData(DapperContext context)
+{
+    using var connection = context.CreateConnection();
+    connection.Open();
+
+    // Seed 3 groups if none exist
+    var groupCount = await connection.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM Groups");
+    List<Guid> groupIds = new List<Guid>();
+    if (groupCount == 0)
+    {
+        const string insertGroup = "INSERT INTO Groups (Id, Name) VALUES (@Id, @Name)";
+        var g1 = new { Id = Guid.NewGuid(), Name = "Family" };
+        var g2 = new { Id = Guid.NewGuid(), Name = "Friends" };
+        var g3 = new { Id = Guid.NewGuid(), Name = "Work" };
+        await connection.ExecuteAsync(insertGroup, g1);
+        await connection.ExecuteAsync(insertGroup, g2);
+        await connection.ExecuteAsync(insertGroup, g3);
+        groupIds.AddRange(new[] { g1.Id, g2.Id, g3.Id });
+    }
+    else
+    {
+        var ids = await connection.QueryAsync<Guid>("SELECT Id FROM Groups LIMIT 3");
+        groupIds.AddRange(ids);
+    }
+
+    // Seed 5 contacts if none exist, and map them to the groups (round-robin)
+    var contactCount = await connection.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM Contacts");
+    if (contactCount == 0)
+    {
+        var contacts = new[]
+        {
+            new { Id = Guid.NewGuid(), FirstName = "Helen", LastName = "George", Email = "helengeorge.com", PhoneNumber = "0256437829" },
+            new { Id = Guid.NewGuid(), FirstName = "John", LastName = "Albert", Email = "johnalbert@gmail.com", PhoneNumber = "+64-555-01000" },
+            new { Id = Guid.NewGuid(), FirstName = "Mary", LastName = "Smith", Email = "marysmith@gmail.com", PhoneNumber = "+1-555-23541" },
+            new { Id = Guid.NewGuid(), FirstName = "Alex", LastName = "Brown", Email = "alexbrown@gmail.com", PhoneNumber = "+1-555-01022" },
+            new { Id = Guid.NewGuid(), FirstName = "Chris", LastName = "Harry", Email = "chrisharry@gmail.com", PhoneNumber = "+1-555-81733" },
+        };
+
+        const string insertContact = @"INSERT INTO Contacts (Id, FirstName, LastName, Email, PhoneNumber)
+                                      VALUES (@Id, @FirstName, @LastName, @Email, @PhoneNumber)";
+        foreach (var c in contacts)
+        {
+            await connection.ExecuteAsync(insertContact, c);
+        }
+
+        const string insertMap = "INSERT INTO ContactGroups (ContactsId, GroupsId) VALUES (@ContactsId, @GroupsId)";
+        var maps = new List<object>();
+        for (int i = 0; i < contacts.Length; i++)
+        {
+            var groupId = groupIds[i % groupIds.Count];
+            maps.Add(new { ContactsId = contacts[i].Id, GroupsId = groupId });
+        }
+        await connection.ExecuteAsync(insertMap, maps);
     }
 }
 
