@@ -61,7 +61,7 @@ Connection string: taken from `ConnectionStrings:DefaultConnection` if present, 
 ---
 ## Docker
 
-![Alt text](images/docker_build_push.png?raw=true "Docker Build Push")
+![Docker Build Push](.github/images/docker_build_push.jpg?raw=true "Docker Build Push")
 
 Build image (local):
 ```bash
@@ -111,7 +111,7 @@ To enable:
     - **Write scope** :'addressbook.read addressbook.write'
     - **Read scope** : 'addressbook.read'
 
-![Alt text](images/swagger.png?raw=true "Swagger")
+![Swagger](.github/images/swagger.png?raw=true "Swagger")
 
 ## API endpoints
 
