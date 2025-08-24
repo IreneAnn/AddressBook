@@ -35,4 +35,20 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
+
+# Copy PFX into the image for HTTPS termination inside the container
+# NOTE: Password is baked below for convenience in dev. Avoid this in production. 
+# TODO: Irene - for temporary
+COPY AddressBook.Api/addressbook.pfx /https/addressbook.pfx
+
+# Configure Kestrel and environment
+ENV ASPNETCORE_ENVIRONMENT="Development"
+ENV ASPNETCORE_URLS="https://+:7255;http://+:8080"
+ENV ASPNETCORE_Kestrel__Certificates__Default__Path="/https/addressbook.pfx"
+ENV ASPNETCORE_Kestrel__Certificates__Default__Password="password123"
+
+# Expose ports
+EXPOSE 7255
+EXPOSE 8080
+
 ENTRYPOINT ["dotnet", "AddressBook.Api.dll"]

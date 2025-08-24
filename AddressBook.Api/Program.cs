@@ -8,29 +8,38 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using OpenIddict.Abstractions;
 using System.Security.Cryptography.X509Certificates;
-using System.Net.Http;
-using System.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure Kestrel to listen on both HTTP and HTTPS
+// Ensure Kestrel server is registered explicitly (safety on some hosts)
+builder.WebHost.UseKestrel();
+
+// Configure Kestrel endpoints conditionally:
+// - Local/dev: bind fixed ports (8080, 7255 if cert available)
+// - Azure App Service/container: DO NOT bind ports here; rely on ASPNETCORE_URLS/WEBSITES_PORT
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.ListenAnyIP(8080); // HTTP
+    options.ListenAnyIP(8080); // HTTP for local/dev
+
+    // Read cert config from environment/config, with sane defaults for Docker image
+    var pfxPath = builder.Configuration["ASPNETCORE_Kestrel__Certificates__Default__Path"] ?? "/https/addressbook.pfx";
+    var pfxPassword = builder.Configuration["ASPNETCORE_Kestrel__Certificates__Default__Password"] ?? "password123";
     options.ListenAnyIP(7255, listenOptions =>
-    {
-        // Prefer mounted PFX in Docker; fallback to dev cert
-        var pfxPath = "/https/addressbook.pfx";
-        var pfxPassword = "password123";
-        if (File.Exists(pfxPath))
-        {
-            listenOptions.UseHttps(pfxPath, pfxPassword);
-        }
-        else
-        {
-            listenOptions.UseHttps(); // dev cert
-        }
-    });
+                {
+
+
+                    if (!string.IsNullOrWhiteSpace(pfxPath) && File.Exists(pfxPath))
+                    {
+
+                        listenOptions.UseHttps(pfxPath, pfxPassword);
+
+                    }
+                    else
+                    {
+                        listenOptions.UseHttps(); // dev cert
+                    }
+                });
+
 });
 
 // ---------------------------
@@ -81,9 +90,9 @@ builder.Services.AddOpenIddict()
             options.AddDevelopmentEncryptionCertificate()
                    .AddDevelopmentSigningCertificate();
         }
-        
 
-                      options.DisableAccessTokenEncryption();
+
+        options.DisableAccessTokenEncryption();
 
         options.UseAspNetCore()
               .EnableTokenEndpointPassthrough()
@@ -223,7 +232,7 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 
-    
+
     // Apply to all endpoints
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
     {
@@ -243,19 +252,29 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+// Log Indian time and app version when the application has fully started
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    var version = "1.0.1";
+    app.Logger.LogInformation(
+        "AddressBook API started. Version:{Version}",
+        version
+    );
+});
+
 //if (app.Environment.IsDevelopment())
 //{
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "AddressBook API v1");
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "AddressBook API v1");
 
-        // OAuth2 Client Credentials setup
-        c.OAuthClientId(builder.Configuration["Auth:ClientId"] ?? "addressbook.client");
-        c.OAuthClientSecret(builder.Configuration["Auth:ClientSecret"] ?? "secret");
-        c.OAuthScopes("addressbook.read", "addressbook.write");
-        c.OAuthUsePkce(); // optional, for auth code flow
-    });
+    // OAuth2 Client Credentials setup
+    c.OAuthClientId(builder.Configuration["Auth:ClientId"] ?? "addressbook.client");
+    c.OAuthClientSecret(builder.Configuration["Auth:ClientSecret"] ?? "secret");
+    c.OAuthScopes("addressbook.read", "addressbook.write");
+    c.OAuthUsePkce(); // optional, for auth code flow
+});
 //}
 
 app.UseRouting();
@@ -290,8 +309,9 @@ using (var scope = app.Services.CreateScope())
 
 app.Run();
 
+
 static async Task SeedOpenIddictScopes(IOpenIddictScopeManager scopeManager)
-{   
+{
 
     // Read scope
     if (await scopeManager.FindByNameAsync("addressbook.read") == null)
