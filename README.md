@@ -1,4 +1,6 @@
 # AddressBook
+
+![Swagger](.github/images/swagger.png?raw=true "Swagger")
 ## AddressBook — Clean Architecture Web API (.NET 9)
 
 A layered Address Book Web API with Contacts and Groups, using SQLite with Dapper for application data access, OpenIddict-based OAuth/OpenID Connect server scaffolding (EF Core used for OpenIddict/migrations), Swagger, and unit tests.
@@ -111,7 +113,6 @@ To enable:
     - **Write scope** :'addressbook.read addressbook.write'
     - **Read scope** : 'addressbook.read'
 
-![Swagger](.github/images/swagger.png?raw=true "Swagger")
 
 ## API endpoints
 
