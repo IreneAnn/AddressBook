@@ -11,20 +11,20 @@ namespace AddressBook.Api.Controllers
 {
     public class AuthorizationController : Controller
     {
-        
+
         [HttpPost("~/connect/token")]
         [Consumes("application/x-www-form-urlencoded")]
         [Produces("application/json")]
         public async Task<IActionResult> Exchange([FromForm] TokenRequestDto dto)
         {
             var request = HttpContext.GetOpenIddictServerRequest();
-            
+
             if (request.IsClientCredentialsGrantType())
             {
                 var identity = new ClaimsIdentity(
                     authenticationType: TokenValidationParameters.DefaultAuthenticationType,
                     nameType: OpenIddictConstants.Claims.Name,
-                    roleType: OpenIddictConstants.Claims.Role);                              
+                    roleType: OpenIddictConstants.Claims.Role);
 
                 identity.AddClaim(OpenIddictConstants.Claims.Subject,
                     request.ClientId ?? throw new InvalidOperationException());
@@ -37,9 +37,6 @@ namespace AddressBook.Api.Controllers
                 {
                     identity.AddClaim(OpenIddictConstants.Claims.Scope, scope);
                 }
-
-                 // 🔹 Add issuer
-                identity.AddClaim(JwtRegisteredClaimNames.Iss, "https://localhost:7255/"); // your issuer
 
                 var principal = new ClaimsPrincipal(identity);
                 principal.SetScopes(request.GetScopes());

@@ -7,38 +7,18 @@ using Dapper;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using OpenIddict.Abstractions;
-using System.Security.Cryptography.X509Certificates;
+using OpenIddict.Validation.AspNetCore;
+using System;
+using System.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Ensure Kestrel server is registered explicitly (safety on some hosts)
 builder.WebHost.UseKestrel();
 
-// Configure Kestrel endpoints conditionally:
-// - Local/dev: bind fixed ports (8080, 7255 if cert available)
-// - Azure App Service/container: DO NOT bind ports here; rely on ASPNETCORE_URLS/WEBSITES_PORT
 builder.WebHost.ConfigureKestrel(options =>
 {
-    options.ListenAnyIP(8080); // HTTP for local/dev
-
-    // Read cert config from environment/config, with sane defaults for Docker image
-    var pfxPath = builder.Configuration["ASPNETCORE_Kestrel__Certificates__Default__Path"] ?? "/https/addressbook.pfx";
-    var pfxPassword = builder.Configuration["ASPNETCORE_Kestrel__Certificates__Default__Password"] ?? "password123";
-    options.ListenAnyIP(7255, listenOptions =>
-                {
-
-
-                    if (!string.IsNullOrWhiteSpace(pfxPath) && File.Exists(pfxPath))
-                    {
-
-                        listenOptions.UseHttps(pfxPath, pfxPassword);
-
-                    }
-                    else
-                    {
-                        listenOptions.UseHttps(); // dev cert
-                    }
-                });
+    options.ListenAnyIP(8080); // HTTP only for local/dev
 
 });
 
@@ -71,112 +51,38 @@ builder.Services.AddOpenIddict()
     .AddServer(options =>
     {
         options.SetTokenEndpointUris("/connect/token");
-        // Use a fixed HTTPS issuer for both dev and docker (port must be published)
-        options.SetIssuer(new Uri("https://localhost:7255/"));
+
         options.AllowClientCredentialsFlow();
 
         options.AcceptAnonymousClients();
 
-        // Prefer persistent signing cert in Docker, otherwise dev certs
-        var pfxPath = "/https/addressbook.pfx";
-        var pfxPassword = "password123";
-        if (File.Exists(pfxPath))
-        {
-            options.AddSigningCertificate(new X509Certificate2(pfxPath, pfxPassword));
-            options.AddDevelopmentEncryptionCertificate();
-        }
-        else
-        {
-            options.AddDevelopmentEncryptionCertificate()
-                   .AddDevelopmentSigningCertificate();
-        }
+        // Register signing/encryption credentials without requiring dev certificates.
+        // Ephemeral keys are fine for local/dev and avoid certificate setup.
+
+        options.AddEphemeralEncryptionKey()
+                        .AddEphemeralSigningKey()
+                        .DisableAccessTokenEncryption();
 
 
-        options.DisableAccessTokenEncryption();
-
+        // If you want to allow HTTP (disable HTTPS requirement) for development, use:
         options.UseAspNetCore()
-              .EnableTokenEndpointPassthrough()
-                        .EnableAuthorizationEndpointPassthrough();
-    });
+            .EnableTokenEndpointPassthrough()
+            .DisableTransportSecurityRequirement();
 
 
-
-builder.Services.AddAuthentication("Bearer")
-    .AddJwtBearer("Bearer", options =>
+    })
+    .AddValidation(options =>
     {
-        options.Authority = "https://localhost:7255/"; // same as SetIssuer
-        // In dev/docker, HTTPS uses a self-signed cert. Allow untrusted certs for metadata in Development.
-        if (builder.Environment.IsDevelopment())
-        {
-            options.RequireHttpsMetadata = false; // allow http/invalid cert for metadata
-            options.BackchannelHttpHandler = new HttpClientHandler
-            {
-                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-            };
-        }
-        else
-        {
-            options.RequireHttpsMetadata = true;
-        }
-
-        // Token validation parameters
-        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = "https://localhost:7255/",   // must match token 'iss'
-
-            ValidateAudience = true,
-            ValidAudience = "addressbook.api",        // must match your token's 'aud'
-            ValidAudiences = new[] { "addressbook.api" },
-            ValidateLifetime = true
-        };
-
-        // Optional: custom JSON error response
-        options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
-        {
-            OnAuthenticationFailed = context =>
-            {
-                context.NoResult();
-                context.Response.StatusCode = 401;
-                context.Response.ContentType = "application/json";
-
-                var result = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    error = "Authentication failed",
-                    details = context.Exception?.Message
-                });
-
-                return context.Response.WriteAsync(result);
-            },
-            OnChallenge = context =>
-            {
-                context.HandleResponse();
-                context.Response.StatusCode = 401;
-                context.Response.ContentType = "application/json";
-
-                var result = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    error = "You are not authorized",
-                    details = context.ErrorDescription ?? "No token or invalid token provided"
-                });
-
-                return context.Response.WriteAsync(result);
-            },
-            OnForbidden = context =>
-            {
-                context.Response.StatusCode = 403;
-                context.Response.ContentType = "application/json";
-
-                var result = System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    error = "Forbidden",
-                    details = "You do not have permission to access this resource"
-                });
-
-                return context.Response.WriteAsync(result);
-            }
-        };
+        // Validate tokens issued by this local server.
+        options.UseLocalServer();
+        options.UseAspNetCore();
     });
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme;
+});
 
 
 builder.Services.AddAuthorization(options =>
@@ -214,7 +120,27 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "AddressBook API", Version = "v1" });
 
-    // OAuth2 definition for Client Credentials
+    // Determine an HTTP base URL for the token endpoint (helps when running without HTTPS).
+    // Prefer explicit override via env/config; fall back to ASPNETCORE_URLS; normalize '+' host to 'localhost'.
+    var overrideBase = Environment.GetEnvironmentVariable("SWAGGER_BASE_URL")
+                       ?? builder.Configuration["Swagger:BaseUrl"];
+    string baseForSwagger;
+    if (!string.IsNullOrWhiteSpace(overrideBase))
+    {
+        baseForSwagger = overrideBase!;
+    }
+    else
+    {
+        var urls = (Environment.GetEnvironmentVariable("ASPNETCORE_URLS") ?? string.Empty)
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var candidate = urls.FirstOrDefault(u => u.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+                       ?? "http://localhost:8080";
+        // Replace wildcard host '+' with 'localhost' to make it a valid absolute URI.
+        baseForSwagger = candidate.Replace("http://+:", "http://localhost:", StringComparison.OrdinalIgnoreCase)
+                                  .Replace("https://+:", "https://localhost:", StringComparison.OrdinalIgnoreCase);
+    }
+    var tokenUrl = new Uri(new Uri(baseForSwagger), "/connect/token");
+
     c.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
     {
         Type = SecuritySchemeType.OAuth2,
@@ -222,7 +148,7 @@ builder.Services.AddSwaggerGen(c =>
         {
             ClientCredentials = new OpenApiOAuthFlow
             {
-                TokenUrl = new Uri("https://localhost:7255/connect/token", UriKind.Absolute),
+                TokenUrl = tokenUrl,
                 Scopes = new Dictionary<string, string>
             {
                 { "addressbook.read", "Read access to Address Book API" },
@@ -273,7 +199,6 @@ app.UseSwaggerUI(c =>
     c.OAuthClientId(builder.Configuration["Auth:ClientId"] ?? "addressbook.client");
     c.OAuthClientSecret(builder.Configuration["Auth:ClientSecret"] ?? "secret");
     c.OAuthScopes("addressbook.read", "addressbook.write");
-    c.OAuthUsePkce(); // optional, for auth code flow
 });
 //}
 

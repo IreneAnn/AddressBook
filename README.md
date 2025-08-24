@@ -52,9 +52,10 @@ A layered Address Book Web API with Contacts and Groups, using SQLite with Dappe
 dotnet restore
 dotnet run -p AddressBook.Api
 ```
-- HTTPS: https://localhost:7255
 
-Swagger UI:  https://localhost:7255/swagger
+- HTTP: http://localhost:8080
+
+Swagger UI:  http://localhost:8080/swagger
 
 Database: SQLite file `addressbook.db` created under `AddressBook.Api/`.
 
@@ -70,9 +71,9 @@ Build image (local):
 docker build -t irene22/address-book-api:latest .
 ```
 
-Run container (maps HTTPS 7255 and HTTP 8080):
+Run container (maps HTTP 8080):
 ```bash
-docker run -p 7255:7255 -p 8080:8080 --name address-book-api irene22/address-book-api:latest
+docker run -p 8080:8080 --name address-book-api irene22/address-book-api:latest
 ```
 
 Push image (already pushed by maintainer):
@@ -174,19 +175,19 @@ Configured:
 ### Client Credentials quick test
 Get token (replace base URL if using IIS Express)
 ```bash
-curl -X POST https://localhost:7255/connect/token \
+curl -X POST http://localhost:8080/connect/token \
  -H "Content-Type: application/x-www-form-urlencoded" \
  -d "grant_type=client_credentials&client_id=addressbook.client&client_secret=secret&scope=addressbook.read%20addressbook.write"
 ```
 
 Call a protected endpoint
 ```bash
-curl https://localhost:7255/api/groups \
+curl http://localhost:8080/api/groups \
  -H "Authorization: Bearer <access_token>"
 ```
 
 Note:
-- The app currently sets the token issuer and JWT validation authority to `https://localhost:7255/`.
+- The app currently sets the token issuer and JWT validation authority to `http://localhost:8080/`.
 
 ---
 
@@ -217,7 +218,7 @@ dotnet test
 ```
 
 ## Known Issues and Considerations
-- Issuer/Authority mismatch: JWT Bearer `Authority` is `https://localhost:7255/`.. Align issuer/authority and token `iss` in `AddressBook.Api/Program.cs` and `AuthorizationController.cs`.
+- Issuer/Authority mismatch: JWT Bearer `Authority` is `http://localhost:8080/`.. Align issuer/authority and token `iss` in `AddressBook.Api/Program.cs` and `AuthorizationController.cs`.
 - AcceptAnonymousClients vs ClientId: `AcceptAnonymousClients()` is enabled, but `AuthorizationController.Exchange()` requires `request.ClientId` (throws if null). Remove anonymous clients or handle missing client IDs.
 - Dev-only settings: `RequireHttpsMetadata = false`, development certs, and `DisableAccessTokenEncryption()` are for local/dev only.
 - Secrets in code: Client secret appears in `SeedOpenIddictClients()` and Swagger UI OAuth config. Move to configuration/user-secrets.
