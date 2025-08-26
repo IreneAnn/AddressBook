@@ -21,7 +21,7 @@
     <PackageReference Include="OpenIddict.EntityFrameworkCore" Version="7.0.0" />
     <PackageReference Include="OpenIddict.Validation.AspNetCore" Version="7.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.3" />
-    <PackageReference Include="Microsoft.ApplicationInsights.AspNetCore" Version="2.22.0" />
+    <PackageReference Include="Azure.Monitor.OpenTelemetry.AspNetCore" Version="1.0.0" />
   </ItemGroup>
 
   <ItemGroup>

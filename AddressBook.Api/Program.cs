@@ -10,6 +10,7 @@ using OpenIddict.Abstractions;
 using OpenIddict.Validation.AspNetCore;
 using System;
 using System.Linq;
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,8 +32,9 @@ builder.Services.AddSingleton<DapperContext>();
 // Register Guid handler for Dapper
 SqlMapper.AddTypeHandler(new AddressBook.Infrastructure.GuidTypeHandler());
 
-// Application Insights (reads APPLICATIONINSIGHTS_CONNECTION_STRING from configuration/env)
-builder.Services.AddApplicationInsightsTelemetry();
+// OpenTelemetry + Azure Monitor exporter (reads APPLICATIONINSIGHTS_CONNECTION_STRING)
+builder.Services.AddOpenTelemetry()
+    .UseAzureMonitor();
 
 // SQLite DB
 var conn = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=addressbook.db";
