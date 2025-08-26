@@ -31,6 +31,9 @@ builder.Services.AddSingleton<DapperContext>();
 // Register Guid handler for Dapper
 SqlMapper.AddTypeHandler(new AddressBook.Infrastructure.GuidTypeHandler());
 
+// Application Insights (reads APPLICATIONINSIGHTS_CONNECTION_STRING from configuration/env)
+builder.Services.AddApplicationInsightsTelemetry();
+
 // SQLite DB
 var conn = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=addressbook.db";
 builder.Services.AddDbContext<AddressBookDbContext>(options =>
