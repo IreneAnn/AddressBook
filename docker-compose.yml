@@ -1,0 +1,17 @@
+version: "3.9"
+services:
+  address-book-api:
+    image: irene22/address-book-api:latest
+    container_name: address-book-api
+    ports:
+      - "8080:8080"
+    volumes:
+      - addressbook-data:/app/data
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      ASPNETCORE_URLS: "http://+:8080"
+      ConnectionStrings__DefaultConnection: "Data Source=/app/data/addressbook.db"
+    restart: unless-stopped
+
+volumes:
+  addressbook-data:

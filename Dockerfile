@@ -32,11 +32,22 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
-# Configure environment (HTTP only)
+# Copy seed database and entrypoint
+COPY AddressBook.Api/addressbook.db /seed/addressbook.db
+COPY AddressBook.Api/entrypoint.sh /app/entrypoint.sh
+## Normalize line endings to LF and ensure executable bit
+RUN sed -i 's/\r$//' /app/entrypoint.sh \
+    && chmod +x /app/entrypoint.sh
+
+# Configure environment (HTTP only) and default connection string to persisted path
 ENV ASPNETCORE_ENVIRONMENT="Development"
 ENV ASPNETCORE_URLS="http://+:8080"
+ENV ConnectionStrings__DefaultConnection="Data Source=/app/data/addressbook.db"
+
+# Persist data directory so DB survives container restarts
+VOLUME ["/app/data"]
 
 # Expose port
 EXPOSE 8080
 
-ENTRYPOINT ["dotnet", "AddressBook.Api.dll"]
+ENTRYPOINT ["/bin/sh", "/app/entrypoint.sh"]

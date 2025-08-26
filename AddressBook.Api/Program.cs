@@ -178,7 +178,7 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
-// Log Indian time and app version when the application has fully started
+// Log app version when the application has fully started
 app.Lifetime.ApplicationStarted.Register(() =>
 {
     var version = "1.0.1";
