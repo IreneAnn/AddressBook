@@ -109,13 +109,14 @@ To enable:
 - Registration in `AddressBook.Api/Program.cs`:
   - `builder.Services.AddOpenTelemetry().UseAzureMonitor();`
 - Ingestion: set env var `APPLICATIONINSIGHTS_CONNECTION_STRING` to your Application Insights resource.
-- Optional: `OTEL_SERVICE_NAME=address-book-api` for friendly service naming.
 - Data shows in Azure Application Insights (Logs: requests, dependencies, traces, exceptions, metrics).
 
 ---
 ## Deployment
 - Deployed to Azure App Service (Linux):
   - Swagger UI: http://address-book-hhfxfaauhjh3arcb.newzealandnorth-01.azurewebsites.net/swagger/index.html
+  
+![Azure Web app](.github/images/application_in_azure.png "Azure Web app")
 - CI/CD uses GitHub Actions (see above) to build and push Docker images; deploy to Azure Web App as configured in your environment.
 
 ---
