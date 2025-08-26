@@ -2,7 +2,14 @@
 set -eu
 
 SEED_DB="/seed/addressbook.db"
-DATA_DIR="/app/data"
+# Choose persisted data dir based on environment
+if [ -n "${WEBSITE_HOSTNAME-}" ]; then
+  # Azure App Service mounted persistent storage
+  DATA_DIR="/home/data"
+else
+  # Container/local default
+  DATA_DIR="/app/data"
+fi
 RUN_DB="$DATA_DIR/addressbook.db"
 
 # Ensure data directory exists

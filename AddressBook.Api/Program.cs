@@ -11,6 +11,7 @@ using OpenIddict.Validation.AspNetCore;
 using System;
 using System.Linq;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
+using System.IO;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -37,7 +38,55 @@ builder.Services.AddOpenTelemetry()
     .UseAzureMonitor();
 
 // SQLite DB
-var conn = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=addressbook.db";
+var conn = builder.Configuration.GetConnectionString("DefaultConnection");
+if (string.IsNullOrWhiteSpace(conn))
+{
+    // Decide base directory based on hosting environment
+    var onAzure = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME"));
+    var inContainer = string.Equals(Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER"), "true", StringComparison.OrdinalIgnoreCase);
+    string baseDir;
+    if (onAzure)
+    {
+        // Azure App Service persistent mount
+        baseDir = "/home/data";
+    }
+    else if (inContainer)
+    {
+        // Local/container run (Docker)
+        baseDir = "/app/data";
+    }
+    else
+    {
+        // Local "dotnet run" scenario -> next to binaries
+        baseDir = Path.Combine(AppContext.BaseDirectory, "data");
+    }
+
+    try { Directory.CreateDirectory(baseDir); } catch { /* ignore */ }
+    var dbPath = Path.Combine(baseDir, "addressbook.db").Replace("\\", "/");
+    conn = $"Data Source={dbPath}";
+}
+else
+{
+    // Best effort: ensure directory exists for provided Data Source path
+    try
+    {
+        var marker = "Data Source=";
+        var idx = conn.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+        if (idx >= 0)
+        {
+            var after = conn.Substring(idx + marker.Length);
+            var end = after.IndexOf(';');
+            var path = end >= 0 ? after.Substring(0, end) : after;
+            if (!string.IsNullOrWhiteSpace(path))
+            {
+                var dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(dir)) Directory.CreateDirectory(dir);
+            }
+        }
+    }
+    catch { /* ignore */ }
+}
+
 builder.Services.AddDbContext<AddressBookDbContext>(options =>
 {
     options.UseSqlite(conn)
