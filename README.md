@@ -16,6 +16,7 @@ A layered Address Book Web API with Contacts and Groups, using SQLite with Dappe
 - Swagger/OpenAPI UI in development with OAuth2 (client credentials) security scheme
 - In-memory caching for list endpoints (60s TTL per page/pageSize)
 - Unit tests with xUnit and Moq
+- OpenTelemetry instrumentation with Azure Monitor exporter (Application Insights backend)
 
 ---
 
@@ -101,6 +102,21 @@ Note: The image is already pushed to Docker Hub. Users can pull and run directly
 
 To enable:
 - Add repo secrets `DOCKER_USERNAME` and `DOCKER_PASSWORD` in GitHub > Settings > Secrets and variables > Actions.
+
+---
+## Observability (OpenTelemetry + Azure Monitor)
+- Package: `Azure.Monitor.OpenTelemetry.AspNetCore`
+- Registration in `AddressBook.Api/Program.cs`:
+  - `builder.Services.AddOpenTelemetry().UseAzureMonitor();`
+- Ingestion: set env var `APPLICATIONINSIGHTS_CONNECTION_STRING` to your Application Insights resource.
+- Optional: `OTEL_SERVICE_NAME=address-book-api` for friendly service naming.
+- Data shows in Azure Application Insights (Logs: requests, dependencies, traces, exceptions, metrics).
+
+---
+## Deployment
+- Deployed to Azure App Service (Linux):
+  - Swagger UI: http://address-book-hhfxfaauhjh3arcb.newzealandnorth-01.azurewebsites.net/swagger/index.html
+- CI/CD uses GitHub Actions (see above) to build and push Docker images; deploy to Azure Web App as configured in your environment.
 
 ---
 ## Swagger/OpenAPI
