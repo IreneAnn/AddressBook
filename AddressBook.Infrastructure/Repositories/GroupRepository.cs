@@ -28,21 +28,22 @@ namespace AddressBook.Infrastructure.Repositories
                 newGroup.Id = Guid.NewGuid();
             }
 
-            var exists = await connection.ExecuteScalarAsync<int>(
+            var exists = await connection.QuerySingleAsync<int>(new CommandDefinition(
                 "SELECT COUNT(1) FROM Groups WHERE Id = @Id COLLATE NOCASE",
-                new { Id = newGroup.Id.ToString() }, transaction: transaction);
+                new { Id = newGroup.Id.ToString() },
+                transaction: transaction));
 
             UpsertStatus upsertStatus;
             if (exists == 0)
             {
                 const string insertSql = "INSERT INTO Groups (Id, Name) VALUES (@Id, @Name)";
-                await connection.ExecuteAsync(insertSql, newGroup, transaction);
+                await connection.ExecuteAsync(new CommandDefinition(insertSql, newGroup, transaction: transaction));
                 upsertStatus = UpsertStatus.Created;
             }
             else
             {
                 const string updateSql = "UPDATE Groups SET Name = @Name WHERE Id = @Id";
-                await connection.ExecuteAsync(updateSql, newGroup, transaction);
+                await connection.ExecuteAsync(new CommandDefinition(updateSql, newGroup, transaction: transaction));
                 upsertStatus = UpsertStatus.Updated;
             }
 
@@ -73,12 +74,12 @@ namespace AddressBook.Infrastructure.Repositories
             using var connection = _context.CreateConnection();
             connection.Open();
 
-            var total = await connection.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM Groups");
+            var total = await connection.QuerySingleAsync<int>(new CommandDefinition("SELECT COUNT(1) FROM Groups"));
             var limit = pageSize;
             var offset = (page - 1) * pageSize;
-            var items = (await connection.QueryAsync<Group>(
+            var items = (await connection.QueryAsync<Group>(new CommandDefinition(
                 "SELECT Id, Name FROM Groups ORDER BY Name LIMIT @limit OFFSET @offset",
-                new { limit, offset })).ToList();
+                new { limit, offset }))).ToList();
 
             const string contactsSql = @"SELECT c.Id, c.FirstName, c.LastName, c.Email, c.PhoneNumber
                                          FROM Contacts c
@@ -86,7 +87,7 @@ namespace AddressBook.Infrastructure.Repositories
                                          WHERE cg.GroupsId = @Id COLLATE NOCASE";
             foreach (var g in items)
             {
-                var contacts = await connection.QueryAsync<Contact>(contactsSql, new { Id = g.Id.ToString() });
+                var contacts = await connection.QueryAsync<Contact>(new CommandDefinition(contactsSql, new { Id = g.Id.ToString() }));
                 g.Contacts = contacts.ToList();
             }
             return (items, total);
@@ -96,6 +97,7 @@ namespace AddressBook.Infrastructure.Repositories
         {
             if (ids == null || ids.Count == 0) return new List<Group>();
             using var connection = _context.CreateConnection();
+            connection.Open();
             var stringIds = ids.Select(x => x.ToString().ToUpper()).ToList();
             var groups = await connection.QueryAsync<Group>("SELECT Id, Name FROM Groups WHERE Id IN @Ids", new { Ids = stringIds });
             return groups.ToList();

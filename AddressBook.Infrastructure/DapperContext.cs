@@ -32,6 +32,6 @@ namespace AddressBook.Infrastructure
             }
         }
 
-        public IDbConnection CreateConnection() => new SqliteConnection(_connectionString);
+        public virtual IDbConnection CreateConnection() => new SqliteConnection(_connectionString);
     }
 }

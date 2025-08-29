@@ -1,6 +1,10 @@
-# AddressBook
+# AddressBook on Azure
+![Addressbook Title](.github/images/Addressbook_Title.png "Addressbook Title")
+
+![Components](.github/images/Components.png "Components")
 
 ![Swagger](.github/images/swagger.png?raw=true "Swagger")
+
 ## AddressBook — Clean Architecture Web API (.NET 9)
 
 A layered Address Book Web API with Contacts and Groups, using SQLite with Dapper for application data access, OpenIddict-based OAuth/OpenID Connect server scaffolding (EF Core used for OpenIddict/migrations), Swagger, and unit tests.

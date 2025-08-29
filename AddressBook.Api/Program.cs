@@ -34,8 +34,17 @@ builder.Services.AddSingleton<DapperContext>();
 SqlMapper.AddTypeHandler(new AddressBook.Infrastructure.GuidTypeHandler());
 
 // OpenTelemetry + Azure Monitor exporter (reads APPLICATIONINSIGHTS_CONNECTION_STRING)
-builder.Services.AddOpenTelemetry()
-    .UseAzureMonitor();
+var aiConn = builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]
+             ?? Environment.GetEnvironmentVariable("APPLICATIONINSIGHTS_CONNECTION_STRING");
+if (!string.IsNullOrWhiteSpace(aiConn))
+{
+    builder.Services.AddOpenTelemetry().UseAzureMonitor();
+}
+else
+{
+    // Register OpenTelemetry without Azure Monitor exporter to avoid runtime exception locally
+    builder.Services.AddOpenTelemetry();
+}
 
 // SQLite DB
 var conn = builder.Configuration.GetConnectionString("DefaultConnection");

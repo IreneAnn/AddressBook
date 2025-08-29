@@ -31,9 +31,10 @@ namespace AddressBook.Infrastructure.Repositories
                 newContact.Id = Guid.NewGuid();
             }
 
-            var exists = await connection.ExecuteScalarAsync<int>(
+            var exists = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
                 "SELECT COUNT(1) FROM Contacts WHERE Id = @Id COLLATE NOCASE",
-                new { Id = newContact.Id.ToString() }, transaction: transaction);
+                new { Id = newContact.Id.ToString() },
+                transaction: transaction));
 
             UpsertStatus upsertStatus;
             if (exists == 0)
@@ -98,13 +99,13 @@ namespace AddressBook.Infrastructure.Repositories
             using var connection = _context.CreateConnection();
             connection.Open();
 
-            var total = await connection.ExecuteScalarAsync<int>("SELECT COUNT(1) FROM Contacts");
+            var total = await connection.QuerySingleAsync<int>(new CommandDefinition("SELECT COUNT(1) FROM Contacts"));
 
             var limit = pageSize;
             var offset = (page - 1) * pageSize;
-            var items = (await connection.QueryAsync<Contact>(
+            var items = (await connection.QueryAsync<Contact>(new CommandDefinition(
                 "SELECT Id, FirstName, LastName, Email, PhoneNumber FROM Contacts ORDER BY FirstName LIMIT @limit OFFSET @offset",
-                new { limit, offset })).ToList();
+                new { limit, offset })) ).ToList();
 
             // Load groups for each contact (simple and clear; acceptable for small page sizes)
             const string groupsSql = @"SELECT g.Id, g.Name
@@ -113,7 +114,7 @@ namespace AddressBook.Infrastructure.Repositories
                                        WHERE cg.ContactsId = @Id";
             foreach (var c in items)
             {
-                var groups = await connection.QueryAsync<Group>(groupsSql, new { Id = c.Id.ToString() });
+                var groups = await connection.QueryAsync<Group>(new CommandDefinition(groupsSql, new { Id = c.Id.ToString() }));
                 c.Groups = groups.ToList();
             }
 
