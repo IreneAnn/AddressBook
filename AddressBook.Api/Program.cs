@@ -12,6 +12,8 @@ using System;
 using System.Linq;
 using Azure.Monitor.OpenTelemetry.AspNetCore;
 using System.IO;
+using Azure.Identity;
+using Azure.Extensions.AspNetCore.Configuration.Secrets;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -27,6 +29,22 @@ builder.WebHost.ConfigureKestrel(options =>
 // ---------------------------
 // Add services
 // ---------------------------
+
+// Azure Key Vault configuration for secrets (Auth client id/secret)
+// Only enable when running in Azure App Service; use appsettings.json for dev/docker
+var isRunningInAzureAppService =
+    !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_HOSTNAME")) ||
+    !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_SITE_NAME")) ||
+    !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("WEBSITE_INSTANCE_ID"));
+
+if (isRunningInAzureAppService)
+{
+    var keyVaultName = builder.Configuration["KeyVaultName"];
+    if (!string.IsNullOrWhiteSpace(keyVaultName))
+    {
+        builder.Configuration.AddAzureKeyVault(new Uri($"https://{keyVaultName}.vault.azure.net/"), new DefaultAzureCredential());
+    }
+}
 
 //Dapper
 builder.Services.AddSingleton<DapperContext>();
@@ -258,9 +276,11 @@ app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "AddressBook API v1");
 
-    // OAuth2 Client Credentials setup
-    c.OAuthClientId(builder.Configuration["Auth:ClientId"] ?? "addressbook.client");
-    c.OAuthClientSecret(builder.Configuration["Auth:ClientSecret"] ?? "secret");
+    // OAuth2 Client Credentials setup (uses Auth:*)
+    var swaggerClientId = builder.Configuration["Auth:ClientId"] ?? "addressbook.client";
+    var swaggerClientSecret = builder.Configuration["Auth:ClientSecret"] ?? "secret";
+    c.OAuthClientId(swaggerClientId);
+    c.OAuthClientSecret(swaggerClientSecret);
     c.OAuthScopes("addressbook.read", "addressbook.write");
 });
 //}
